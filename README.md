@@ -201,15 +201,18 @@ export { GET, POST, PUT, DELETE } from '$lib/fluidkit/proxy';
 
 ## Quick Start
 
-```bash
+<!-- ```bash
 # Generate TypeScript clients from your FastAPI code
 python -m fluidkit.generate src/lib/api/users.py src/routes/dashboard/data.py
 
 # Or process entire directories
 python -m fluidkit.generate src/ --watch
-```
+``` -->
+Try out running test.py
 
-```typescript
+> Note: After CLI implemented we will have a comprehensive documentation
+
+<!-- ```typescript
 // Use generated clients immediately
 import { create_user, get_user } from '$lib/api/users';
 
@@ -223,7 +226,7 @@ if (result.success) {
 } else {
     console.error("Error:", result.error);
 }
-```
+``` -->
 
 ## Philosophy
 
