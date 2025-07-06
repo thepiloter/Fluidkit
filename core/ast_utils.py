@@ -1,11 +1,35 @@
 import ast
-from .models import *
+from core.nodes import *
 
 def interface(cls):
     """Mark class for TypeScript interface generation"""
     cls._fluid_interface = True
     return cls
 
+@dataclass
+class FieldInfo:
+    """Extracted information from Field() calls or basic assignments"""
+    default: Any = None
+    description: Optional[str] = None
+    constraints: Dict[str, Any] = None
+    
+    def __post_init__(self):
+        if self.constraints is None:
+            self.constraints = {}
+
+@dataclass
+class FastAPIInfo:
+    """Extracted information from FastAPI annotation calls (Query, Path, Body, etc.)"""
+    default: Any = None
+    description: Optional[str] = None
+    alias: Optional[str] = None                # Query(alias="search_term")
+    embed: Optional[bool] = None               # Body(embed=True)
+    constraints: Dict[str, Any] = None         # Validation constraints
+    annotation_type: Optional[str] = None      # "Query", "Path", "Body", etc.
+    
+    def __post_init__(self):
+        if self.constraints is None:
+            self.constraints = {}
 
 # === TYPE ANNOTATIONS EXTRACTION === #
 def extract_type_annotation(node: ast.AST) -> FieldAnnotation:
@@ -181,3 +205,124 @@ def convert_attribute_value(node: ast.Attribute) -> str:
         return None  # Can't handle complex expressions
     
     return f"{base}.{node.attr}"
+
+
+# === FIELD INFO EXTRACTION === #
+def extract_field_info(node: ast.AST) -> FieldInfo:
+    """
+    Extract default value and metadata from Field() calls or basic values.
+    
+    Handles:
+    - Field(...) → FieldInfo(default=None) - required field
+    - Field(25) → FieldInfo(default=25) - positional default  
+    - Field(default=25, description="...") → full extraction
+    - Basic values → FieldInfo(default=value)
+    """
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "Field":
+        default_value = None
+        description = None
+        constraints = {}
+        
+        # Handle positional args: Field(...) or Field(25)
+        if node.args:
+            arg = node.args[0]
+            if isinstance(arg, ast.Constant):
+                if arg.value is ...:  # Field(...) - required field
+                    default_value = None
+                else:  # Field(25) - positional default
+                    default_value = arg.value
+        
+        # Handle keyword args
+        for keyword in node.keywords:
+            if keyword.arg == "default":
+                default_value = _extract_default_value_recursive(keyword.value)
+            elif keyword.arg == "description" and isinstance(keyword.value, ast.Constant):
+                description = keyword.value.value
+            elif keyword.arg in ["ge", "le", "gt", "lt", "min_length", "max_length", "regex"]:
+                if isinstance(keyword.value, ast.Constant):
+                    constraints[keyword.arg] = keyword.value.value
+        
+        return FieldInfo(
+            default=default_value,
+            description=description,
+            constraints=constraints
+        )
+    else:
+        # Not a Field() call, use basic extraction
+        basic_default = extract_basic_default_value(node)
+        return FieldInfo(default=basic_default)
+
+def _extract_default_value_recursive(node: ast.AST) -> Any:
+    """Extract default value recursively handling nested Field() calls"""
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "Field":
+        # Recursive Field() handling
+        if node.args and isinstance(node.args[0], ast.Constant):
+            if node.args[0].value is ...:
+                return None
+            else:
+                return node.args[0].value
+        
+        for keyword in node.keywords:
+            if keyword.arg == "default":
+                return _extract_default_value_recursive(keyword.value)
+        return None
+    else:
+        return extract_basic_default_value(node)
+
+
+# === FASTAPI PARAMETER INFO EXTRACTION === #
+def extract_fastapi_info(node: ast.AST) -> FastAPIInfo:
+    """Extract information from FastAPI annotation calls"""
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+        func_name = node.func.id
+        
+        # FastAPI annotation functions we care about
+        fastapi_annotations = {
+            "Query", "Path", "Body", "Header", "Form", "File", 
+            "Depends", "Cookie", "Security"
+        }
+        
+        if func_name not in fastapi_annotations:
+            return FastAPIInfo(default=extract_basic_default_value(node))
+        
+        default_value = None
+        description = None
+        alias = None
+        embed = None
+        constraints = {}
+        
+        # Handle positional args: Query(...) or Query(10)
+        if node.args:
+            arg = node.args[0]
+            if isinstance(arg, ast.Constant):
+                if arg.value is ...:  # Query(...) - required
+                    default_value = None
+                else:  # Query(10) - positional default
+                    default_value = arg.value
+        
+        # Handle keyword args
+        for keyword in node.keywords:
+            if keyword.arg == "default":
+                default_value = _extract_default_value_recursive(keyword.value)
+            elif keyword.arg == "description" and isinstance(keyword.value, ast.Constant):
+                description = keyword.value.value
+            elif keyword.arg == "alias" and isinstance(keyword.value, ast.Constant):
+                alias = keyword.value.value
+            elif keyword.arg == "embed" and isinstance(keyword.value, ast.Constant):
+                embed = keyword.value.value
+            elif keyword.arg in ["ge", "le", "gt", "lt", "min_length", "max_length", "regex", "deprecated"]:
+                if isinstance(keyword.value, ast.Constant):
+                    constraints[keyword.arg] = keyword.value.value
+        
+        return FastAPIInfo(
+            default=default_value,
+            description=description,
+            alias=alias,
+            embed=embed,
+            constraints=constraints,
+            annotation_type=func_name
+        )
+    else:
+        # Not a FastAPI annotation call
+        basic_default = extract_basic_default_value(node)
+        return FastAPIInfo(default=basic_default)

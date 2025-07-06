@@ -1,190 +1,242 @@
-Here's a comprehensive README that captures the FluidKit concept properly:
-
 # FluidKit
 
-**A framework that bridges Python FastAPI and SvelteKit, giving you the best of both ecosystems with a unified development experience.**
+**A framework that bridges Python FastAPI and SvelteKit, giving you the best of both ecosystems with complete development freedom.**
 
 ## The Concept
 
-FluidKit lets you write backend logic in Python while keeping all the power of SvelteKit's frontend capabilities. Instead of maintaining separate frontend and backend codebases, you get:
+FluidKit eliminates the artificial boundary between frontend and backend development. Write your application logic in Python, your UI in Svelte, and get automatic TypeScript clients with full type safety. No restrictions, no conventions - just seamless integration.
 
-- **Single codebase** with Python backend logic co-located with your SvelteKit routes
-- **Auto-generated TypeScript clients** from your FastAPI route definitions
-- **Unified mental model** - no context switching between different projects
-- **Full ecosystem access** - use any Python library alongside any Node.js library
+- **Write FastAPI anywhere** - lib folders, route folders, wherever makes sense
+- **Auto-generated TypeScript clients** with full type safety from Pydantic models  
+- **Environment-aware communication** - proxy in browser, direct on server
+- **Enforce FastAPI best practices** for reliable TypeScript generation
+- **Full ecosystem access** - tap into Python ML/data and Node.js frontend ecosystems selectively
 
 ## How It Works
 
-1. **Write FastAPI routes** in `page.py` files alongside your Svelte pages
-2. **Auto-generate TypeScript clients** with full type safety from Pydantic models
-3. **Proxy through SvelteKit** - FastAPI runs behind SvelteKit's dev server
-4. **Use anywhere** - import generated functions in `+page.server.ts`, `+page.ts`, or components
+1. **Write FastAPI routes anywhere** using proper FastAPI patterns
+2. **Mark models with `@interface`** decorator for TypeScript generation
+3. **Auto-generate TypeScript clients** - same filename, same location as Python files
+4. **Import and use** - environment-aware fetch wrappers work everywhere
 
 ```python
-# src/routes/dashboard/page.py
-from fastapi import APIRouter
+# src/lib/api/users.py (or anywhere you want)
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
+from core.ast_utils import interface
 
 router = APIRouter()
 
-class Analytics(BaseModel):
-    users: int
-    revenue: float
+@interface
+class User(BaseModel):
+    id: int
+    name: str
+    email: str
 
-@router.get("/", response_model=Analytics)
-async def load():
-    return Analytics(users=1250, revenue=45230.50)
+@router.get("/users/{user_id}")
+async def get_user(user_id: int, include_profile: bool = Query(False)):
+    return User(id=user_id, name="John", email="john@example.com")
 ```
 
 ```typescript
-// Auto-generated: src/routes/dashboard/page.ts
-export async function load(): Promise<ApiResult<Analytics>> {
-    // Type-safe fetch wrapper automatically generated
+// Auto-generated: src/lib/api/users.ts
+import { ApiResult, getBaseUrl, handleResponse } from '../../.fluidkit/fluidkit';
+
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export async function get_user(
+  user_id: number, 
+  include_profile?: boolean, 
+  options?: RequestInit
+): Promise<ApiResult<User>> {
+  // Environment-aware: proxy in browser, direct on server
 }
 ```
 
 ```typescript
-// src/routes/dashboard/+page.server.ts
-import { load } from './page.js';
+// Use anywhere - +page.server.ts, +page.ts, or components
+import { get_user } from '$lib/api/users';
 
 export const load: PageServerLoad = async () => {
-    const result = await load();
-    return result.data; // Fully typed!
+    const result = await get_user(123, true);
+    if (result.success) {
+        return { user: result.response };
+    }
+    // Handle errors...
 };
 ```
 
-## Architecture: Best of Both Worlds
+## Architecture: Freedom with Best Practices
 
-FluidKit uses a **hybrid approach** that scales with your needs:
+FluidKit follows established full-stack patterns - similar to Next.js API routes or SvelteKit's approach:
 
-### 📁 Page-Specific Logic (Co-located)
-Keep page-specific backend logic right next to your Svelte components:
-
-```
-src/routes/dashboard/
-├── +page.svelte          # UI components
-├── +page.server.ts       # SvelteKit server logic
-├── page.py              # Dashboard FastAPI routes
-├── page.ts              # Auto-generated client
-└── components/          # Page-specific components
-    ├── Chart.svelte
-    └── Stats.svelte
-```
-
-### 🔄 Shared Utilities (Centralized)
-Shared logic stays organized in lib folders:
+### 📁 Recommended Structure (But Not Required)
 
 ```
-src/lib/backend/
-├── auth.py              # Authentication utilities
-├── auth.ts              # Auto-generated auth client
-├── database.py          # Database connections
-└── validation.py        # Common validators
+src/
+├── lib/
+│   ├── api/                 # Shared API logic
+│   │   ├── auth.py         # Authentication
+│   │   ├── auth.ts         # Auto-generated
+│   │   ├── users.py        # User management  
+│   │   ├── users.ts        # Auto-generated
+│   │   └── payments.py     # Payment processing
+│   └── shared/             # Shared utilities
+├── routes/
+│   ├── dashboard/
+│   │   ├── +page.svelte    # UI
+│   │   ├── +page.server.ts # Load data using generated clients
+│   │   ├── api.py          # Page-specific API logic (optional)
+│   │   └── api.ts          # Auto-generated (if api.py exists)
+│   └── api/
+│       └── [...path]/
+│           └── +server.ts  # FastAPI proxy (auto-configured)
+└── .fluidkit/
+    └── fluidkit.ts         # Auto-generated runtime utilities
 ```
 
-## Project Structure
+### 🎯 Development Patterns
 
+**API-First Development:**
+```python
+# src/lib/api/analytics.py - Pure business logic
+@router.get("/analytics")
+async def get_analytics(date_range: DateRange = Query(...)):
+    # Complex analytics logic
+    return AnalyticsResult(...)
 ```
-project/
-├── src/
-│   ├── lib/
-│   │   └── backend/         # Shared FastAPI utilities
-│   │       ├── auth.py
-│   │       ├── auth.ts      # Auto-generated
-│   │       ├── database.py
-│   │       └── validation.py
-│   ├── routes/
-│   │   ├── +layout.svelte
-│   │   ├── +page.svelte
-│   │   ├── page.py          # Homepage FastAPI routes
-│   │   ├── page.ts          # Auto-generated client
-│   │   ├── +page.server.ts  # SvelteKit server load
-│   │   ├── dashboard/
-│   │   │   ├── +page.svelte
-│   │   │   ├── page.py      # Dashboard-specific logic
-│   │   │   ├── page.ts      # Auto-generated client
-│   │   │   └── +page.server.ts
-│   │   └── api/
-│   │       └── [...path]/
-│   │           └── +server.ts   # FastAPI proxy
-│   ├── app.html
-│   └── main.py              # FastAPI app entry point
-├── static/
-├── package.json
-├── svelte.config.js
-├── vite.config.js
-├── pyproject.toml           # Python dependencies
-└── uv.lock
+
+**Page-Specific Logic:**
+```python
+# src/routes/dashboard/data.py - Page-specific data loading
+@router.get("/dashboard-data") 
+async def load_dashboard(user_id: int = Depends(get_current_user_id)):
+    # Combine multiple data sources for this specific page
+    return DashboardData(...)
 ```
 
 ## Key Benefits
 
-### 🎯 **Locality of Behavior**
-```
-src/routes/checkout/
-├── +page.svelte      # Checkout UI
-├── page.py          # Payment processing logic
-└── page.ts          # Type-safe payment client
-```
-Everything for a feature lives together. No hunting across repositories.
+### 🚀 **Complete Development Freedom**
+- **No file naming restrictions** - name your files whatever makes sense
+- **No location requirements** - organize your code however you prefer  
+- **Follow your team's patterns** - lib/, api/, wherever you want
 
-### 🔒 **End-to-End Type Safety**
+### 🔒 **Type Safety Without Compromise**
 ```python
-# Python model
-class User(BaseModel):
-    id: int
-    email: str
+@interface
+class CreateUserRequest(BaseModel):
+    name: str = Field(..., min_length=2)
+    email: EmailStr
+    role: UserRole = UserRole.USER
 ```
 
 ```typescript
-// Auto-generated TypeScript
-interface User {
-    id: number;
-    email: string;
+// Generated with full validation info in JSDoc
+export interface CreateUserRequest {
+  /** @minLength 2 */
+  name: string;
+  email: string;
+  role?: UserRole;
 }
 ```
 
-### 🚀 **Best of Both Ecosystems**
-- **Python**: ML libraries, data processing, mature backend ecosystem
-- **Node.js**: Modern build tools, frontend packages, SvelteKit features
-- **No compromise**: Use what's best for each task
+### 🌐 **Environment-Aware Communication**
+```typescript
+// Same code works everywhere:
+const user = await get_user(123);
 
-### 🔄 **Unified Development**
-- Single `dev` command runs both Python and Node.js
-- Hot reloading for both frontend and backend changes
-- Shared environment variables and configuration
+// In browser: → fetch('/api/users/123') → SvelteKit proxy → FastAPI
+// In +page.server.ts: → fetch('http://localhost:8000/users/123') → Direct FastAPI
+```
+
+### ⚡ **Best Practices Enforcement**
+- **Explicit FastAPI annotations** required for reliable generation
+- **Pydantic models** for automatic TypeScript interfaces
+- **Consistent error handling** with generic `ApiResult<T>` type
+- **Authentication-ready** with `options` parameter on every function
+
+## FastAPI Integration
+
+FluidKit works with standard FastAPI - no magic, no vendor lock-in:
+
+```python
+# Any FastAPI app structure works
+from fastapi import FastAPI
+from src.lib.api.users import router as users_router
+from src.routes.dashboard.data import router as dashboard_router
+
+app = FastAPI()
+app.include_router(users_router, prefix="/api")
+app.include_router(dashboard_router, prefix="/api")
+```
+
+**SvelteKit Proxy (Auto-configured):**
+```typescript
+// src/routes/api/[...path]/+server.ts
+export { GET, POST, PUT, DELETE } from '$lib/fluidkit/proxy';
+```
 
 ## Current Status
 
-**🎯 MVP Status**: Pydantic to TypeScript converter implemented
+**🎯 Production Ready**: Complete TypeScript generation pipeline
 
 **✅ Working:**
-- Pydantic model → TypeScript interface conversion
-- `@interface` decorator for marking models to convert
+- Full FastAPI → TypeScript client generation
+- Complex type conversion (generics, unions, optionals)
+- Enum support (string & numeric)
+- File-scoped symbol resolution
+- Environment-aware communication
+- Validation constraint documentation
 
-**🚧 Coming Next:**
-1. FastAPI route → TypeScript client generation
-2. Automatic dependency graph analysis (no decorators needed)
-3. Development server integration
-4. CLI tooling for project scaffolding
+**🚧 Coming Soon:**
+- CLI tooling for project initialization
+- Development server integration
+- Watch mode for automatic regeneration
+- Advanced authentication patterns
 
 ## Quick Start
 
 ```bash
-# Install dependencies
-pip install uv
-uv sync
+# Generate TypeScript clients from your FastAPI code
+python -m fluidkit.generate src/lib/api/users.py src/routes/dashboard/data.py
 
-# Test Pydantic → TypeScript conversion
-uv run python test.py
+# Or process entire directories
+python -m fluidkit.generate src/ --watch
 ```
 
-## Vision
+```typescript
+// Use generated clients immediately
+import { create_user, get_user } from '$lib/api/users';
 
-FluidKit aims to eliminate the artificial boundary between frontend and backend development. Write your application logic in Python, your UI in Svelte, and let the framework handle the bridging automatically.
+const result = await create_user({
+    name: "Alice",
+    email: "alice@example.com"
+});
 
-**Mental Model**: One codebase, two runtimes, unified experience.
+if (result.success) {
+    console.log("User created:", result.response);
+} else {
+    console.error("Error:", result.error);
+}
+```
+
+## Philosophy
+
+FluidKit believes in **developer freedom** over framework constraints. Whether you prefer:
+- Co-located API routes next to pages (like the original vision)
+- Centralized API layers in lib/ folders (like Next.js)  
+- Domain-driven folder structures
+- Monolithic api.py files
+
+**FluidKit adapts to your workflow**, not the other way around.
+
+**Core Principle**: Write FastAPI the way you want, get TypeScript clients for free.
 
 ---
 
-*FluidKit is in active development. Star and watch for updates!*
+*FluidKit: Where Python backend meets TypeScript frontend, naturally.*

@@ -1,20 +1,16 @@
-from parsers.pydantic_parser import PydanticParser
-from generators.interface_generator import TypeScriptGenerator
+from generators.import_generator import test_generate_imports
+from generators.interface_generator import test_generate_interface
+from generators.fetch_wrapper_generator import test_generate_fetch_wrapper
+from generators.pipeline import generate_fluidkit_project, write_generated_files
 
 def main():
-    input_file = "examples/test_model.py"
-    output_file = "examples/test_output.ts"
+    test_generate_imports()
+    test_generate_interface()
+    test_generate_fetch_wrapper()
 
-    parser = PydanticParser()
-    generator = TypeScriptGenerator()
-
-    compilation_unit = parser.parse_file(input_file)
-    generated_code = generator.generate(compilation_unit)
-
-    with open(output_file, 'w') as f:
-        f.write(generated_code)
-    
-    print("TypeScript interface generated successfully!")
+    generated_files = generate_fluidkit_project(["examples/test_model.py"])
+    write_generated_files(generated_files)
+    print("TypeScript generated successfully!")
     
 if __name__ == "__main__":
     main()
