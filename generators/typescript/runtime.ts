@@ -4,29 +4,19 @@
  */
 
 export interface ApiResult<T = any> {
-  response?: T;           // Successful response data
-  error?: string;         // Error message if request failed
-  status: number;         // HTTP status code
-  success: boolean;       // Convenience property
+  data?: T;
+  error?: string;
+  status: number;
+  success: boolean;
 }
 
-/**
- * Get base URL for API requests
- * Environment-aware: SvelteKit proxy in browser, direct FastAPI on server
- */
 export function getBaseUrl(): string {
   if (typeof window !== 'undefined') {
-    // Client-side: SvelteKit proxy
     return '/api';
   }
-  // Server-side: Direct FastAPI
   return process.env.FASTAPI_URL || 'http://localhost:8000';
 }
 
-/**
- * Handle fetch response with typed error handling
- * Non-throwing approach for predictable error handling
- */
 export async function handleResponse<T = any>(response: Response): Promise<ApiResult<T>> {
   const status = response.status;
   const success = response.ok;
@@ -44,7 +34,7 @@ export async function handleResponse<T = any>(response: Response): Promise<ApiRe
   
   try {
     const responseData = await response.json();
-    return { response: responseData, status, success: true };
+    return { data: responseData, status, success: true };
   } catch (e) {
     return { 
       error: 'Failed to parse response JSON', 

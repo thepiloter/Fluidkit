@@ -1,47 +1,37 @@
+"""
+FluidKit V2 Interface Generator
+
+Generates TypeScript interfaces from V2 ModelNode objects with enhanced enum detection
+and security-aware documentation.
+"""
+
 from typing import List
-from core.nodes import *
-from core.ast_utils import *
+from core.schema import ModelNode, Field, FieldConstraints, ContainerType, BaseType
+
 
 def generate_interface(model: ModelNode) -> str:
     """
-    Generate TypeScript interface for a single model.
+    Generate TypeScript interface for a single V2 ModelNode.
     
     Args:
-        model: ModelNode with fields and metadata
+        model: V2 ModelNode with fields and metadata
         
     Returns:
         Complete TypeScript interface with JSDoc as string
     """
     
-    # Determine if this should be an enum or interface
-    if _is_enum_model(model):
+    # Use V2's explicit enum flag instead of heuristic detection
+    if model.is_enum:
         return _generate_enum(model)
     else:
         return _generate_interface(model)
 
 
-def _is_enum_model(model: ModelNode) -> bool:
-    """
-    Determine if model represents an enum.
-    
-    Adapted from original logic but using ModelNode structure.
-    """
-    # Pydantic models are always interfaces
-    if model.inheritance and "BaseModel" in model.inheritance:
-        return False
-    
-    # For non-Pydantic classes, check if all fields are constants
-    return (model.fields and 
-            all(field.default is not None and 
-                field.annotation.is_simple() 
-                for field in model.fields))
-
-
 def _generate_interface(model: ModelNode) -> str:
-    """Generate TypeScript interface with JSDoc header."""
+    """Generate TypeScript interface with conditional JSDoc header."""
     lines = []
     
-    # Generate JSDoc header
+    # Generate JSDoc header only if we have useful information
     header = _generate_interface_header(model)
     if header:
         lines.append(header)
@@ -65,54 +55,60 @@ def _generate_interface(model: ModelNode) -> str:
 
 
 def _generate_interface_header(model: ModelNode) -> str:
-    """Generate interface header with field overview."""
-    lines = []
-    lines.append("/**")
+    """Generate interface header with field overview - only if we have useful info."""
+    parts_to_include = []
     
-    # Add model docstring
+    # Add model docstring if present
     if model.docstring:
-        lines.append(f" * {model.docstring}")
-        if model.fields:
+        parts_to_include.append(model.docstring)
+    
+    # Add field documentation if any fields have descriptions
+    fields_with_descriptions = [f for f in model.fields if f.description]
+    if fields_with_descriptions:
+        if model.docstring:  # Add separator if we have docstring
+            parts_to_include.append("")
+        
+        for field in fields_with_descriptions:
+            parts_to_include.append(f"@property {field.name} - {field.description}")
+    
+    # Only generate header if we have something useful to say
+    if not parts_to_include:
+        return ""
+    
+    lines = ["/**"]
+    for part in parts_to_include:
+        if part == "":  # Empty line separator
             lines.append(" *")
-    
-    # Add field documentation
-    if model.fields:
-        for field in model.fields:
-            field_line = f" * @property {field.name}"
-            if field.description:
-                field_line += f" - {field.description}"
-            lines.append(field_line)
-    
+        else:
+            lines.append(f" * {part}")
     lines.append(" */")
+    
     return "\n".join(lines)
 
 
 def _generate_interface_field(field: Field) -> List[str]:
     """
-    Generate single interface field with helpful JSDoc.
+    Generate single interface field with conditional JSDoc.
     
     Returns list of lines (for proper indentation).
     """
     lines = []
     
-    # Collect JSDoc information
+    # Collect JSDoc information only if present
     jsdoc_parts = []
+    
     if field.description:
         jsdoc_parts.append(field.description)
     
     if field.default is not None:
         if isinstance(field.default, str):
-            # Check if it's an enum reference
-            if "." in str(field.default) and not field.default.startswith('"'):
-                jsdoc_parts.append(f"@default {field.default}")
-            else:
-                jsdoc_parts.append(f'@default "{field.default}"')
+            jsdoc_parts.append(f'@default "{field.default}"')
         elif isinstance(field.default, bool):
             jsdoc_parts.append(f"@default {str(field.default).lower()}")
         else:
             jsdoc_parts.append(f"@default {field.default}")
-        
-    # Add validation constraints from FieldConstraints
+    
+    # Add validation constraints only if they exist
     if field.constraints:
         constraint_docs = _generate_constraint_docs(field.constraints)
         jsdoc_parts.extend(constraint_docs)
@@ -139,8 +135,8 @@ def _generate_interface_field(field: Field) -> List[str]:
     return lines
 
 
-def _generate_constraint_docs(constraints) -> List[str]:
-    """Generate JSDoc documentation for field constraints."""
+def _generate_constraint_docs(constraints: FieldConstraints) -> List[str]:
+    """Generate JSDoc documentation for field constraints - only if present."""
     docs = []
     
     if constraints.min_value is not None:
@@ -158,15 +154,19 @@ def _generate_constraint_docs(constraints) -> List[str]:
     if constraints.regex_pattern:
         docs.append(f"@pattern {constraints.regex_pattern}")
     
+    # Add deprecation warning if marked deprecated
+    if constraints.deprecated:
+        docs.append("@deprecated")
+    
     return docs
 
 
 def _generate_enum(model: ModelNode) -> str:
-    """Generate TypeScript enum."""
+    """Generate TypeScript enum with conditional JSDoc."""
     lines = []
     
-    # Generate JSDoc header (reuse interface header logic)
-    header = _generate_interface_header(model)
+    # Generate JSDoc header only if useful
+    header = _generate_interface_header(model)  # Reuse interface header logic
     if header:
         lines.append(header)
     
@@ -192,10 +192,10 @@ def _generate_enum_field(field: Field) -> str:
         return f"{field.name} = {field.default},"
 
 
-# === TYPE CONVERSION (Core Logic from Original) ===
+# === TYPE CONVERSION (Unchanged from V1 - works with FieldAnnotation) === #
 
-def _convert_annotation_to_typescript(annotation: FieldAnnotation, is_top_level: bool = False) -> str:
-    """Convert IR annotation to TypeScript type string."""
+def _convert_annotation_to_typescript(annotation, is_top_level: bool = False) -> str:
+    """Convert V2 FieldAnnotation to TypeScript type string."""
     if annotation.container:
         return _convert_container_type(annotation, is_top_level)
     elif annotation.custom_type:
@@ -206,7 +206,7 @@ def _convert_annotation_to_typescript(annotation: FieldAnnotation, is_top_level:
         return "any"
 
 
-def _convert_base_type(base_type: BaseType) -> str:
+def _convert_base_type(base_type) -> str:
     """Convert base types to TypeScript."""
     mapping = {
         BaseType.STRING: "string",
@@ -219,7 +219,7 @@ def _convert_base_type(base_type: BaseType) -> str:
     return mapping.get(base_type, "any")
 
 
-def _convert_container_type(annotation: FieldAnnotation, is_top_level: bool = False) -> str:
+def _convert_container_type(annotation, is_top_level: bool = False) -> str:
     """Convert container types to TypeScript."""
     if annotation.container == ContainerType.OPTIONAL:
         return _convert_optional_type(annotation, is_top_level)
@@ -237,7 +237,7 @@ def _convert_container_type(annotation: FieldAnnotation, is_top_level: bool = Fa
         return "any"
 
 
-def _convert_array_type(annotation: FieldAnnotation) -> str:
+def _convert_array_type(annotation) -> str:
     """Convert List[T] to T[]."""
     if annotation.args:
         inner_type = _convert_annotation_to_typescript(annotation.args[0], is_top_level=False)
@@ -249,7 +249,7 @@ def _convert_array_type(annotation: FieldAnnotation) -> str:
     return "any[]"
 
 
-def _convert_object_type(annotation: FieldAnnotation) -> str:
+def _convert_object_type(annotation) -> str:
     """Convert Dict[K, V] to Record<K, V>."""
     if len(annotation.args) >= 2:
         key_type = _convert_annotation_to_typescript(annotation.args[0], is_top_level=False)
@@ -262,7 +262,7 @@ def _convert_object_type(annotation: FieldAnnotation) -> str:
         return "Record<string, any>"
 
 
-def _convert_union_type(annotation: FieldAnnotation) -> str:
+def _convert_union_type(annotation) -> str:
     """Convert Union[A, B] to A | B."""
     if annotation.args:
         type_parts = []
@@ -273,7 +273,7 @@ def _convert_union_type(annotation: FieldAnnotation) -> str:
     return "any"
 
 
-def _convert_literal_type(annotation: FieldAnnotation) -> str:
+def _convert_literal_type(annotation) -> str:
     """Convert Literal["a", "b"] to "a" | "b"."""
     if annotation.literal_values:
         literal_parts = []
@@ -287,7 +287,7 @@ def _convert_literal_type(annotation: FieldAnnotation) -> str:
     return "any"
 
 
-def _convert_tuple_type(annotation: FieldAnnotation) -> str:
+def _convert_tuple_type(annotation) -> str:
     """Convert Tuple[A, B] to [A, B]."""
     if annotation.args:
         type_parts = []
@@ -299,11 +299,9 @@ def _convert_tuple_type(annotation: FieldAnnotation) -> str:
         return "[any]"
 
 
-def _convert_optional_type(annotation: FieldAnnotation, is_top_level: bool = False) -> str:
+def _convert_optional_type(annotation, is_top_level: bool = False) -> str:
     """
     Convert Optional[T] to T (top-level) or T | null (nested).
-    
-    This is the sophisticated logic from your original code.
     """
     if annotation.args:
         inner_type = _convert_annotation_to_typescript(annotation.args[0], is_top_level=False)
@@ -316,7 +314,7 @@ def _convert_optional_type(annotation: FieldAnnotation, is_top_level: bool = Fal
     return "any"
 
 
-# === UTILITIES ===
+# === UTILITIES === #
 
 def _escape_typescript_string(value: str) -> str:
     """Escape string literals for TypeScript."""
@@ -324,20 +322,21 @@ def _escape_typescript_string(value: str) -> str:
 
 
 def _is_field_optional(field: Field) -> bool:
-    """
-    Determine if field should be optional in TypeScript.
-    
-    Uses the sophisticated logic from your original code.
-    """
+    """Determine if field should be optional in TypeScript."""
     return (
         field.is_optional or  # Has default value
         field.annotation.is_optional()  # Is Optional[T] or Union with None
     )
 
 
-# === TESTING HELPER ===
-def test_generate_interface():
-    """Test interface generation with various type scenarios."""
+# === TESTING HELPER === #
+
+def test_v2_interface_generator():
+    """Test V2 interface generator with various ModelNode scenarios."""
+    from core.schema import ModelNode, Field, FieldAnnotation, FieldConstraints, ModuleLocation, BaseType, ContainerType
+    
+    # Create test location
+    location = ModuleLocation(module_path="test.models", file_path="/test/models.py")
     
     # === TEST 1: Simple Interface ===
     print("=== TEST 1: Simple Interface ===")
@@ -362,62 +361,44 @@ def test_generate_interface():
                 default=True
             )
         ],
-        location=SourceLocation("test.py", 1, 0),
-        ast_node=None,
+        location=location,
         docstring="Simple user model",
-        inheritance=["BaseModel"]
+        inheritance=["BaseModel"],
+        is_enum=False
     )
     
     result = generate_interface(simple_user)
     print(result)
     print("\n" + "="*50 + "\n")
     
-    # === TEST 2: Optional and Union Types ===
-    print("=== TEST 2: Optional and Union Types ===")
-    complex_user = ModelNode(
-        name="ComplexUser",
+    # === TEST 2: Enum ===
+    print("=== TEST 2: Enum ===")
+    status_enum = ModelNode(
+        name="UserStatus",
         fields=[
             Field(
-                name="email",
-                annotation=FieldAnnotation(
-                    container=ContainerType.OPTIONAL,
-                    args=[FieldAnnotation(base_type=BaseType.STRING)]
-                ),
-                default=None,
-                description="Optional email address"
+                name="ACTIVE",
+                annotation=FieldAnnotation(base_type=BaseType.STRING),
+                default="active"
             ),
             Field(
-                name="tags",
-                annotation=FieldAnnotation(
-                    container=ContainerType.ARRAY,
-                    args=[FieldAnnotation(base_type=BaseType.STRING)]
-                ),
-                default=[],
-                description="User tags"
-            ),
-            Field(
-                name="role",
-                annotation=FieldAnnotation(
-                    container=ContainerType.UNION,
-                    args=[
-                        FieldAnnotation(base_type=BaseType.STRING),
-                        FieldAnnotation(base_type=BaseType.NULL)
-                    ]
-                ),
-                default=None
+                name="INACTIVE",
+                annotation=FieldAnnotation(base_type=BaseType.STRING),
+                default="inactive"
             )
         ],
-        location=SourceLocation("test.py", 10, 0),
-        ast_node=None,
-        inheritance=["BaseModel"]
+        location=location,
+        docstring="User status enumeration",
+        inheritance=["Enum"],
+        is_enum=True  # V2 explicit enum flag
     )
     
-    result = generate_interface(complex_user)
+    result = generate_interface(status_enum)
     print(result)
     print("\n" + "="*50 + "\n")
     
-    # === TEST 3: Validation Constraints ===
-    print("=== TEST 3: Validation Constraints ===")
+    # === TEST 3: Complex Types with Constraints ===
+    print("=== TEST 3: Complex Types with Constraints ===")
     validated_user = ModelNode(
         name="ValidatedUser",
         fields=[
@@ -436,140 +417,54 @@ def test_generate_interface():
                 annotation=FieldAnnotation(base_type=BaseType.NUMBER),
                 constraints=FieldConstraints(
                     min_value=0,
-                    max_value=120
+                    max_value=120,
+                    deprecated=True
                 ),
                 description="User age"
+            ),
+            Field(
+                name="profile",
+                annotation=FieldAnnotation(
+                    container=ContainerType.OPTIONAL,
+                    args=[FieldAnnotation(custom_type="Profile")]
+                ),
+                default=None
             )
         ],
-        location=SourceLocation("test.py", 20, 0),
-        ast_node=None,
-        inheritance=["BaseModel"]
+        location=location,
+        inheritance=["BaseModel"],
+        is_enum=False
     )
     
     result = generate_interface(validated_user)
     print(result)
     print("\n" + "="*50 + "\n")
     
-    # === TEST 4: Custom Types and Complex Structures ===
-    print("=== TEST 4: Custom Types and Complex Structures ===")
-    product = ModelNode(
-        name="Product",
+    # === TEST 4: Model with No Descriptions (minimal JSDoc) ===
+    print("=== TEST 4: Model with No Descriptions ===")
+    minimal_model = ModelNode(
+        name="MinimalUser",
         fields=[
             Field(
                 name="id",
-                annotation=FieldAnnotation(base_type=BaseType.STRING),
+                annotation=FieldAnnotation(base_type=BaseType.NUMBER),
                 default=None
             ),
             Field(
-                name="owner",
-                annotation=FieldAnnotation(custom_type="User"),
-                default=None,
-                description="Product owner"
-            ),
-            Field(
-                name="metadata",
-                annotation=FieldAnnotation(
-                    container=ContainerType.OBJECT,
-                    args=[
-                        FieldAnnotation(base_type=BaseType.STRING),
-                        FieldAnnotation(base_type=BaseType.ANY)
-                    ]
-                ),
-                default={},
-                description="Product metadata"
-            ),
-            Field(
-                name="status",
-                annotation=FieldAnnotation(
-                    container=ContainerType.LITERAL,
-                    literal_values=["draft", "published", "archived"]
-                ),
-                default="draft"
+                name="name",
+                annotation=FieldAnnotation(base_type=BaseType.STRING),
+                default="test"
             )
         ],
-        location=SourceLocation("test.py", 30, 0),
-        ast_node=None,
-        docstring="Product with custom types and literals",
-        inheritance=["BaseModel"]
+        location=location,
+        inheritance=["BaseModel"],
+        is_enum=False
+        # No docstring, no field descriptions
     )
     
-    result = generate_interface(product)
-    print(result)
-    print("\n" + "="*50 + "\n")
-    
-    # === TEST 5: Enum Generation ===
-    print("=== TEST 5: Enum Generation ===")
-    status_enum = ModelNode(
-        name="Status",
-        fields=[
-            Field(
-                name="PENDING",
-                annotation=FieldAnnotation(base_type=BaseType.STRING),
-                default="pending"
-            ),
-            Field(
-                name="COMPLETED",
-                annotation=FieldAnnotation(base_type=BaseType.STRING),
-                default="completed"
-            ),
-            Field(
-                name="FAILED",
-                annotation=FieldAnnotation(base_type=BaseType.STRING),
-                default="failed"
-            )
-        ],
-        location=SourceLocation("test.py", 40, 0),
-        ast_node=None,
-        docstring="Task status enumeration",
-        inheritance=[]  # No BaseModel = potential enum
-    )
-    
-    result = generate_interface(status_enum)
-    print(result)
-    print("\n" + "="*50 + "\n")
-    
-    # === TEST 6: Tuple and Complex Arrays ===
-    print("=== TEST 6: Tuple and Complex Arrays ===")
-    coordinate = ModelNode(
-        name="Coordinate",
-        fields=[
-            Field(
-                name="position",
-                annotation=FieldAnnotation(
-                    container=ContainerType.TUPLE,
-                    args=[
-                        FieldAnnotation(base_type=BaseType.NUMBER),
-                        FieldAnnotation(base_type=BaseType.NUMBER)
-                    ]
-                ),
-                default=None,
-                description="X, Y coordinates"
-            ),
-            Field(
-                name="connections",
-                annotation=FieldAnnotation(
-                    container=ContainerType.ARRAY,
-                    args=[
-                        FieldAnnotation(
-                            container=ContainerType.UNION,
-                            args=[
-                                FieldAnnotation(custom_type="Coordinate"),
-                                FieldAnnotation(base_type=BaseType.NULL)
-                            ]
-                        )
-                    ]
-                ),
-                default=[],
-                description="Connected coordinates"
-            )
-        ],
-        location=SourceLocation("test.py", 50, 0),
-        ast_node=None,
-        inheritance=["BaseModel"]
-    )
-    
-    result = generate_interface(coordinate)
+    result = generate_interface(minimal_model)
     print(result)
 
+
 if __name__ == "__main__":
-    test_generate_interface()
+    test_v2_interface_generator()
