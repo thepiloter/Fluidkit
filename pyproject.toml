@@ -1,10 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "fluidkit"
-version = "2.0"
-description = "Add your description here"
+version = "2.0.0"
+description = "Automatic TypeScript client generation for FastAPI through runtime introspection"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = [
+license = {text = "MIT"}
+authors = [
+    {name = "Aswanth Manoj", email = "aswanthmanoj51@gmail.com"},
+]
+keywords = ["fastapi", "typescript", "code-generation", "full-stack", "type-safety", "sveltekit", "nextjs", "nuxtjs"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
     "fastapi>=0.115.14",
     "pydantic>=2.11.7",
 ]
+
+[project.urls]
+Homepage = "https://github.com/AswanthManoj/Fluidkit"
+Repository = "https://github.com/AswanthManoj/Fluidkit"
+Issues = "https://github.com/AswanthManoj/Fluidkit/issues"
+
+[tool.setuptools.packages.find]
+include = ["fluidkit*"]
+
+[tool.setuptools.package-data]
+fluidkit = ["runtimes/**/*.ts", "runtimes/**/*.js", "runtimes/**/*.py"]

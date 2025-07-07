@@ -6,8 +6,8 @@ from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
 
-from core.schema import ModuleLocation, FieldAnnotation, BaseType
-from introspection.models import _introspect_pydantic_model, _introspect_enum_model
+from fluidkit.core.schema import ModuleLocation, FieldAnnotation, BaseType
+from fluidkit.introspection.models import _introspect_pydantic_model, _introspect_enum_model
 
 
 def test_pydantic_model_introspection():
@@ -72,7 +72,7 @@ def test_model_discovery_from_routes():
     """Test discovery of models from route references"""
     
     # Create mock route nodes for testing
-    from core.schema import RouteNode, Field, FieldConstraints, ParameterType
+    from fluidkit.core.schema import RouteNode, Field, FieldConstraints, ParameterType
     
     # Mock route that references User model
     route = RouteNode(

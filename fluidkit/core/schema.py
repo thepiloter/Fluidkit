@@ -12,7 +12,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Set
 
-# === TYPE SYSTEM (Unchanged - Perfect for TypeScript generation) === #
+# === TYPE SYSTEM === #
 
 class BaseType(Enum):
     """Primitive TypeScript types for code generation."""
@@ -70,7 +70,7 @@ class LanguageType(Enum):
     # GO = "go"
 
 
-# === ANNOTATIONS (Unchanged - Core type system) === #
+# === ANNOTATIONS === #
 
 @dataclass
 class FieldAnnotation:
@@ -132,7 +132,7 @@ class FieldAnnotation:
         return types
 
 
-# === CONSTRAINTS (Unchanged - Validation metadata) === #
+# === CONSTRAINTS  === #
 
 @dataclass
 class FieldConstraints:
@@ -168,7 +168,7 @@ class FieldConstraints:
             self.custom = {}
 
 
-# === LOCATION SYSTEM (New - Module-based for runtime introspection) === #
+# === LOCATION SYSTEM === #
 
 @dataclass
 class ModuleLocation:
@@ -277,7 +277,7 @@ class ModuleLocation:
             return f"./{target_location.module_path.replace('.', '/')}"
 
 
-# === FIELD SYSTEM (Unchanged - Universal field representation) === #
+# === FIELD SYSTEM === #
 
 @dataclass
 class Field:
@@ -383,7 +383,7 @@ class SecurityRequirement:
     location: Optional[str] = None             # "header", "query", "cookie" (for apiKey)
     parameter_name: Optional[str] = None       # "X-API-Key", "Authorization" (for apiKey)
 
-# === CORE NODES (Simplified for runtime introspection) === #
+# === CORE NODES === #
 
 @dataclass
 class ModelNode:
@@ -486,7 +486,7 @@ class RouteNode:
                 if param.constraints and param.constraints.parameter_type in auth_types]
 
 
-# === APP-WIDE COLLECTION (New - Replace CompilationUnit) === #
+# === APP-WIDE COLLECTION === #
 
 @dataclass
 class FluidKitApp:

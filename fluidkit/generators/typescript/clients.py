@@ -6,8 +6,8 @@ FluidKit runtime imports and clean automatic indentation management.
 """
 
 from typing import List, Dict, Set
-from core.constants import FluidKitRuntime
-from core.schema import RouteNode, Field, FieldAnnotation, ParameterType, SecurityRequirement
+from fluidkit.core.constants import FluidKitRuntime
+from fluidkit.core.schema import RouteNode, Field, FieldAnnotation, ParameterType, SecurityRequirement
 
 
 class CodeBuilder:
@@ -521,7 +521,7 @@ def _convert_annotation_to_typescript(annotation: FieldAnnotation, is_top_level:
     """Convert FieldAnnotation to TypeScript type string."""
     # Import and reuse the type conversion logic from interface generator
     try:
-        from generators.typescript.interfaces import _convert_annotation_to_typescript as convert_type
+        from fluidkit.generators.typescript.interfaces import _convert_annotation_to_typescript as convert_type
         return convert_type(annotation, is_top_level)
     except ImportError:
         # Fallback if interface generator not available
@@ -545,7 +545,7 @@ def _convert_annotation_to_typescript(annotation: FieldAnnotation, is_top_level:
 
 def test_v2_fetch_wrapper_generator():
     """Test V2 fetch wrapper generator with various RouteNode scenarios."""
-    from core.schema import RouteNode, Field, FieldAnnotation, FieldConstraints, ModuleLocation, BaseType, ParameterType, SecurityRequirement
+    from fluidkit.core.schema import RouteNode, Field, FieldAnnotation, FieldConstraints, ModuleLocation, BaseType, ParameterType, SecurityRequirement
     
     location = ModuleLocation(module_path="test.routes", file_path="/test/routes.py")
     

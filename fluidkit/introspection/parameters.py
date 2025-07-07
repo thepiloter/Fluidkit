@@ -7,8 +7,8 @@ with proper parameter classification and constraint extraction.
 
 from typing import List, Dict, Any
 
-from core.type_conversion import python_type_to_field_annotation
-from core.schema import Field, FieldAnnotation, FieldConstraints, ParameterType, BaseType
+from fluidkit.core.type_conversion import python_type_to_field_annotation
+from fluidkit.core.schema import Field, FieldAnnotation, FieldConstraints, ParameterType, BaseType
 
 
 def extract_parameters_from_dependant(dependant, type_hints: Dict[str, Any]) -> List[Field]:

@@ -53,17 +53,19 @@ wheels = [
 
 [[package]]
 name = "fluidkit"
-version = "2.0"
-source = { virtual = "." }
-dependencies = [
+version = "2.0.0"
+source = { editable = "." }
+
+[package.optional-dependencies]
+dev = [
     { name = "fastapi" },
     { name = "pydantic" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "fastapi", specifier = ">=0.115.14" },
-    { name = "pydantic", specifier = ">=2.11.7" },
+    { name = "fastapi", marker = "extra == 'dev'", specifier = ">=0.115.14" },
+    { name = "pydantic", marker = "extra == 'dev'", specifier = ">=2.11.7" },
 ]
 
 [[package]]

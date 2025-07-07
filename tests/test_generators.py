@@ -2,10 +2,10 @@
 Code generation tests for TypeScript interfaces, clients, and imports
 """
 
-from generators.typescript.interfaces import generate_interface
-from generators.typescript.clients import generate_fetch_wrapper
-from generators.typescript.imports import generate_imports_for_file, ImportContext
-from core.schema import (ModelNode, RouteNode, Field, FieldAnnotation, FieldConstraints, 
+from fluidkit.generators.typescript.interfaces import generate_interface
+from fluidkit.generators.typescript.clients import generate_fetch_wrapper
+from fluidkit.generators.typescript.imports import generate_imports_for_file, ImportContext
+from fluidkit.core.schema import (ModelNode, RouteNode, Field, FieldAnnotation, FieldConstraints, 
 ModuleLocation, FluidKitApp, BaseType, ParameterType)
 
 

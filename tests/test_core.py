@@ -2,8 +2,8 @@
 Core functionality tests for FluidKit type system and data structures
 """
 
-from core.type_conversion import python_type_to_field_annotation
-from core.schema import FieldAnnotation, BaseType, ContainerType, ModuleLocation
+from fluidkit.core.type_conversion import python_type_to_field_annotation
+from fluidkit.core.schema import FieldAnnotation, BaseType, ContainerType, ModuleLocation
 
 
 def test_python_type_to_field_annotation():

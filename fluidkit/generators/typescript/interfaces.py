@@ -6,7 +6,7 @@ and security-aware documentation.
 """
 
 from typing import List
-from core.schema import ModelNode, Field, FieldConstraints, ContainerType, BaseType
+from fluidkit.core.schema import ModelNode, Field, FieldConstraints, ContainerType, BaseType
 
 
 def generate_interface(model: ModelNode) -> str:
@@ -333,7 +333,7 @@ def _is_field_optional(field: Field) -> bool:
 
 def test_v2_interface_generator():
     """Test V2 interface generator with various ModelNode scenarios."""
-    from core.schema import ModelNode, Field, FieldAnnotation, FieldConstraints, ModuleLocation, BaseType, ContainerType
+    from fluidkit.core.schema import ModelNode, Field, FieldAnnotation, FieldConstraints, ModuleLocation, BaseType, ContainerType
     
     # Create test location
     location = ModuleLocation(module_path="test.models", file_path="/test/models.py")

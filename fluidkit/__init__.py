@@ -2,8 +2,8 @@
 FluidKit - FastAPI to TypeScript/Python/etc. code generation
 """
 
-from core.schema import LanguageType
-from core.integrator import integrate, introspect_only, generate_only
+from fluidkit.core.schema import LanguageType
+from fluidkit.core.integrator import integrate, introspect_only, generate_only
 
 
 __version__ = "2.0.0"

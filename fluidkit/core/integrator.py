@@ -1,5 +1,3 @@
-# v2/core/app_integrator.py
-
 """
 FluidKit V2 App Integration
 
@@ -14,9 +12,9 @@ from fastapi import FastAPI
 from typing import List, Dict, Tuple
 from fastapi.routing import APIRoute
 
-from introspection.routes import route_to_node
-from introspection.models import discover_models_from_routes
-from core.schema import FluidKitApp, RouteNode, LanguageType
+from fluidkit.introspection.routes import route_to_node
+from fluidkit.introspection.models import discover_models_from_routes
+from fluidkit.core.schema import FluidKitApp, RouteNode, LanguageType
 
 
 logger = logging.getLogger(__name__)
@@ -94,7 +92,7 @@ def _generate_and_write_typescript(
     **options
 ) -> Dict[str, str]:
     """Generate TypeScript files and write them to disk."""
-    from generators.typescript.pipeline import generate_typescript_files
+    from fluidkit.generators.typescript.pipeline import generate_typescript_files
     
     # Generate file contents
     generated_files = generate_typescript_files(
@@ -253,7 +251,7 @@ def introspect_only(app: FastAPI, **options) -> FluidKitApp:
     Convenience function for introspection only (no code generation).
     """
     # Temporarily generate files to get FluidKitApp, but don't write them
-    from generators.typescript.pipeline import generate_typescript_files
+    from fluidkit.generators.typescript.pipeline import generate_typescript_files
     
     project_root = options.get('project_root') or str(Path.cwd().resolve())
     
@@ -283,7 +281,7 @@ def generate_only(app: FastAPI, strategy: str = "mirror", **options) -> Dict[str
     Returns:
         Dict mapping file_path -> file_content (files not written to disk)
     """
-    from generators.typescript.pipeline import generate_typescript_files
+    from fluidkit.generators.typescript.pipeline import generate_typescript_files
     
     project_root = options.get('project_root') or str(Path.cwd().resolve())
     

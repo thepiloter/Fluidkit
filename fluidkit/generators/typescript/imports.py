@@ -12,8 +12,8 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Union, Set, Dict, List, Optional
 
-from core.constants import FluidKitRuntime
-from core.schema import RouteNode, ModelNode, ModuleLocation, FluidKitApp
+from fluidkit.core.constants import FluidKitRuntime
+from fluidkit.core.schema import RouteNode, ModelNode, ModuleLocation, FluidKitApp
 
 
 @dataclass
@@ -288,7 +288,7 @@ def generate_imports_for_file(
 
 def test_import_generation():
     """Test import generation with various scenarios."""
-    from core.schema import (
+    from fluidkit.core.schema import (
         RouteNode, ModelNode, Field, FieldAnnotation, ModuleLocation, 
         FluidKitApp, BaseType, ParameterType, FieldConstraints
     )

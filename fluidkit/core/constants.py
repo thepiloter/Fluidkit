@@ -1,5 +1,3 @@
-# fluidkit/core/constants.py
-
 """
 FluidKit constants for runtime imports and code generation
 """

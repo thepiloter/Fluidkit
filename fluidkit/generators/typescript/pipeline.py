@@ -10,11 +10,11 @@ into complete TypeScript files with proper import statements.
 from pathlib import Path
 from typing import Dict, List, Union
 
-from core.schema import FluidKitApp, RouteNode, ModelNode
-from core.constants import FluidKitRuntime, GenerationPaths
-from generators.typescript.interfaces import generate_interface
-from generators.typescript.clients import generate_fetch_wrapper
-from generators.typescript.imports import generate_imports_for_file, ImportContext
+from fluidkit.core.schema import FluidKitApp, RouteNode, ModelNode
+from fluidkit.core.constants import FluidKitRuntime, GenerationPaths
+from fluidkit.generators.typescript.interfaces import generate_interface
+from fluidkit.generators.typescript.clients import generate_fetch_wrapper
+from fluidkit.generators.typescript.imports import generate_imports_for_file, ImportContext
 
 
 def generate_typescript_files(
@@ -80,7 +80,7 @@ def group_nodes_by_generated_files(
     Returns:
         Dict mapping ts_file_path -> {"models": [...], "routes": [...]}
     """
-    from generators.typescript.imports import get_generated_file_path
+    from fluidkit.generators.typescript.imports import get_generated_file_path
     
     files_content = {}
     
@@ -250,7 +250,7 @@ def integrate_with_generation(app, strategy: str = "mirror", **options):
     
     Uses current working directory as project root.
     """
-    from core.integrator import integrate
+    from fluidkit.core.integrator import integrate
     
     # Step 1: Perform FluidKit introspection (pass None to use auto-detection)
     fluid_app = integrate(app, project_root=None, **options)

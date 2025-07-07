@@ -11,9 +11,9 @@ from pathlib import Path
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 
-from core.utils import format_annotation_for_display
-from core.type_conversion import python_type_to_field_annotation
-from core.schema import ModelNode, RouteNode, Field, FieldAnnotation, ModuleLocation, BaseType
+from fluidkit.core.utils import format_annotation_for_display
+from fluidkit.core.type_conversion import python_type_to_field_annotation
+from fluidkit.core.schema import ModelNode, RouteNode, Field, FieldAnnotation, ModuleLocation, BaseType
 
 
 def discover_models_from_routes(route_nodes: List[RouteNode], project_root: Optional[str] = None) -> List[ModelNode]:

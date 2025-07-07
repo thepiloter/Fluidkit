@@ -8,11 +8,11 @@ runtime introspection instead of AST parsing.
 import typing
 from typing import Optional
 
-from core.schema import RouteNode, ModuleLocation
+from fluidkit.core.schema import RouteNode, ModuleLocation
 from fastapi.dependencies.utils import get_dependant
-from core.type_conversion import python_type_to_field_annotation
-from introspection.security import extract_security_requirements
-from introspection.parameters import extract_parameters_from_dependant
+from fluidkit.core.type_conversion import python_type_to_field_annotation
+from fluidkit.introspection.security import extract_security_requirements
+from fluidkit.introspection.parameters import extract_parameters_from_dependant
 
 
 def route_to_node(route) -> Optional[RouteNode]:

@@ -5,7 +5,7 @@ Extracts security requirements from FastAPI Dependant for TypeScript JSDoc gener
 """
 
 from typing import List
-from core.schema import SecurityRequirement
+from fluidkit.core.schema import SecurityRequirement
 
 
 def extract_security_requirements(dependant) -> List[SecurityRequirement]:

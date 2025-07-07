@@ -1,4 +1,4 @@
-from core.schema import *
+from fluidkit.core.schema import *
 
 def format_annotation_for_display(annotation: FieldAnnotation) -> str:
     """Format FieldAnnotation for readable display."""

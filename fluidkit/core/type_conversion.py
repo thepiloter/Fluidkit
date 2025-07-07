@@ -6,12 +6,12 @@ Handles typing module constructs, primitive types, and custom classes with
 full recursive support for complex nested types.
 """
 
-import inspect
 import typing
-from typing import Any, Optional, Union, get_origin, get_args
+import inspect
 from enum import Enum
+from typing import Any, Union, get_origin, get_args
 
-from core.schema import FieldAnnotation, BaseType, ContainerType
+from fluidkit.core.schema import FieldAnnotation, BaseType, ContainerType
 
 
 def python_type_to_field_annotation(py_type: Any) -> FieldAnnotation:

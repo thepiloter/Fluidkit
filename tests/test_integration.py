@@ -4,7 +4,7 @@ End-to-end integration tests using the test FastAPI app
 
 from pathlib import Path
 from tests.app import app
-from core.integrator import integrate, introspect_only, generate_only
+from fluidkit.core.integrator import integrate, introspect_only, generate_only
 
 
 def test_end_to_end_typescript_generation():
