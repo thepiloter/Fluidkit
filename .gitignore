@@ -205,3 +205,11 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+
+
+# Custom ignore
+tests/app.ts
+tests/schema.ts
+.fluidkit/
+

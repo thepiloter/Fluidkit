@@ -1,245 +1,288 @@
 # FluidKit
 
-**A framework that bridges Python FastAPI and SvelteKit, giving you the best of both ecosystems with complete development freedom.**
+**Zero-configuration FastAPI to TypeScript code generation using runtime introspection.**
 
-## The Concept
+## What is FluidKit?
 
-FluidKit eliminates the artificial boundary between frontend and backend development. Write your application logic in Python, your UI in Svelte, and get automatic TypeScript clients with full type safety. No restrictions, no conventions - just seamless integration.
-
-- **Write FastAPI anywhere** - lib folders, route folders, wherever makes sense
-- **Auto-generated TypeScript clients** with full type safety from Pydantic models  
-- **Environment-aware communication** - proxy in browser, direct on server
-- **Enforce FastAPI best practices** for reliable TypeScript generation
-- **Full ecosystem access** - tap into Python ML/data and Node.js frontend ecosystems selectively
-
-## How It Works
-
-1. **Write FastAPI routes anywhere** using proper FastAPI patterns
-2. **Mark models with `@interface`** decorator for TypeScript generation
-3. **Auto-generate TypeScript clients** - same filename, same location as Python files
-4. **Import and use** - environment-aware fetch wrappers work everywhere
+FluidKit automatically generates TypeScript clients from your FastAPI applications using runtime introspection. No decorators, no configuration files, no guesswork - just point it at your FastAPI app and get production-ready TypeScript code.
 
 ```python
-# src/lib/api/users.py (or anywhere you want)
-from fastapi import APIRouter, Query
+# Your existing FastAPI app
+from fastapi import FastAPI, Query, Path
 from pydantic import BaseModel
-from core.ast_utils import interface
+from typing import Optional, List
 
-router = APIRouter()
-
-@interface
 class User(BaseModel):
     id: int
     name: str
-    email: str
+    email: Optional[str] = None
 
-@router.get("/users/{user_id}")
-async def get_user(user_id: int, include_profile: bool = Query(False)):
-    return User(id=user_id, name="John", email="john@example.com")
+app = FastAPI()
+
+@app.get("/users/{user_id}")
+async def get_user(user_id: int = Path(...), include_profile: bool = Query(False)) -> User:
+    return User(id=user_id, name="John Doe")
+
+@app.post("/users")
+async def create_user(user: User) -> User:
+    return user
+```
+
+```python
+# Generate TypeScript clients
+import fluidkit
+
+# That's it - zero configuration needed
+fluidkit.integrate(app)
 ```
 
 ```typescript
-// Auto-generated: src/lib/api/users.ts
-import { ApiResult, getBaseUrl, handleResponse } from '../../.fluidkit/fluidkit';
-
+// Auto-generated: TypeScript clients with full type safety
 export interface User {
   id: number;
   name: string;
-  email: string;
+  email?: string;
 }
 
-export async function get_user(
+export const get_user = async (
   user_id: number, 
   include_profile?: boolean, 
   options?: RequestInit
-): Promise<ApiResult<User>> {
-  // Environment-aware: proxy in browser, direct on server
+): Promise<ApiResult<User>> => {
+  // Environment-aware fetch implementation
+}
+
+export const create_user = async (
+  user: User, 
+  options?: RequestInit
+): Promise<ApiResult<User>> => {
+  // Complete fetch wrapper with JSON handling
 }
 ```
 
-```typescript
-// Use anywhere - +page.server.ts, +page.ts, or components
-import { get_user } from '$lib/api/users';
+## How It Works
 
-export const load: PageServerLoad = async () => {
-    const result = await get_user(123, true);
-    if (result.success) {
-        return { user: result.response };
-    }
-    // Handle errors...
-};
-```
+FluidKit uses **runtime introspection** instead of static analysis:
 
-## Architecture: Freedom with Best Practices
+1. **Introspects your FastAPI app** using FastAPI's internal dependency system
+2. **Discovers Pydantic models** through recursive tree traversal from route types  
+3. **Generates TypeScript code** with perfect parameter classification
+4. **Writes files to disk** with automatic import resolution
 
-FluidKit follows established full-stack patterns - similar to Next.js API routes or SvelteKit's approach:
+**No decorators. No configuration. Just your existing FastAPI code.**
 
-### 📁 Recommended Structure (But Not Required)
+## Key Features
 
-```
-src/
-├── lib/
-│   ├── api/                 # Shared API logic
-│   │   ├── auth.py         # Authentication
-│   │   ├── auth.ts         # Auto-generated
-│   │   ├── users.py        # User management  
-│   │   ├── users.ts        # Auto-generated
-│   │   └── payments.py     # Payment processing
-│   └── shared/             # Shared utilities
-├── routes/
-│   ├── dashboard/
-│   │   ├── +page.svelte    # UI
-│   │   ├── +page.server.ts # Load data using generated clients
-│   │   ├── api.py          # Page-specific API logic (optional)
-│   │   └── api.ts          # Auto-generated (if api.py exists)
-│   └── api/
-│       └── [...path]/
-│           └── +server.ts  # FastAPI proxy (auto-configured)
-└── .fluidkit/
-    └── fluidkit.ts         # Auto-generated runtime utilities
-```
-
-### 🎯 Development Patterns
-
-**API-First Development:**
+### Zero Configuration
 ```python
-# src/lib/api/analytics.py - Pure business logic
-@router.get("/analytics")
-async def get_analytics(date_range: DateRange = Query(...)):
-    # Complex analytics logic
-    return AnalyticsResult(...)
+# Works with any existing FastAPI app
+fluidkit.integrate(app)  # That's literally it
 ```
 
-**Page-Specific Logic:**
+### Perfect FastAPI Compliance
+- Uses FastAPI's own parameter classification (`Query`, `Path`, `Body`, etc.)
+- Handles complex Pydantic models and inheritance
+- Supports FastAPI security requirements
+- Multi-method routes (`@app.api_route(methods=["GET", "POST"])`)
+
+### Intelligent Type Generation
 ```python
-# src/routes/dashboard/data.py - Page-specific data loading
-@router.get("/dashboard-data") 
-async def load_dashboard(user_id: int = Depends(get_current_user_id)):
-    # Combine multiple data sources for this specific page
-    return DashboardData(...)
-```
-
-## Key Benefits
-
-### 🚀 **Complete Development Freedom**
-- **No file naming restrictions** - name your files whatever makes sense
-- **No location requirements** - organize your code however you prefer  
-- **Follow your team's patterns** - lib/, api/, wherever you want
-
-### 🔒 **Type Safety Without Compromise**
-```python
-@interface
-class CreateUserRequest(BaseModel):
-    name: str = Field(..., min_length=2)
-    email: EmailStr
-    role: UserRole = UserRole.USER
+# Python
+def get_users(
+    status: Optional[UserStatus] = Query(None),
+    limit: int = Query(10, ge=1, le=100)
+) -> List[User]:
 ```
 
 ```typescript
-// Generated with full validation info in JSDoc
-export interface CreateUserRequest {
-  /** @minLength 2 */
-  name: string;
-  email: string;
-  role?: UserRole;
-}
+// Generated TypeScript with validation docs
+export const get_users = async (
+  status?: UserStatus,
+  /** @minimum 1 @maximum 100 @default 10 */
+  limit?: number,
+  options?: RequestInit
+): Promise<ApiResult<User[]>> => {
 ```
 
-### 🌐 **Environment-Aware Communication**
+### Strategy-Based Generation
+```python
+# Co-locate: .ts files next to .py files
+fluidkit.integrate(app, strategy="co-locate")
+
+# Mirror: .ts files in .fluidkit/ directory  
+fluidkit.integrate(app, strategy="mirror")
+```
+
+### Multi-Language Ready
+```python
+# Currently supports TypeScript
+fluidkit.integrate(app, lang="typescript")
+
+# Future: Python clients, Zod schemas, etc.
+# fluidkit.integrate(app, lang="python") 
+# fluidkit.integrate(app, lang="zod")
+```
+
+## Generated Code Quality
+
+### Environment-Aware Communication
 ```typescript
 // Same code works everywhere:
-const user = await get_user(123);
+const result = await get_user(123);
 
-// In browser: → fetch('/api/users/123') → SvelteKit proxy → FastAPI
-// In +page.server.ts: → fetch('http://localhost:8000/users/123') → Direct FastAPI
+// Browser: fetch('/api/users/123') → SvelteKit proxy → FastAPI
+// Server: fetch('http://localhost:8000/users/123') → Direct FastAPI
 ```
 
-### ⚡ **Best Practices Enforcement**
-- **Explicit FastAPI annotations** required for reliable generation
-- **Pydantic models** for automatic TypeScript interfaces
-- **Consistent error handling** with generic `ApiResult<T>` type
-- **Authentication-ready** with `options` parameter on every function
+### Complete Error Handling
+```typescript
+interface ApiResult<T> {
+  data?: T;              // Successful response
+  error?: string;        // Error message  
+  status: number;        // HTTP status
+  success: boolean;      // Convenience flag
+}
 
-## FastAPI Integration
+const result = await create_user(userData);
+if (result.success) {
+  console.log("Created:", result.data);
+} else {
+  console.error("Error:", result.error);
+}
+```
 
-FluidKit works with standard FastAPI - no magic, no vendor lock-in:
+### Smart Import Resolution
+```typescript
+// Auto-generated imports based on strategy
+import { User, UserStatus } from './models';
+import { ApiResult, getBaseUrl, handleResponse } from '../.fluidkit/runtime';
+```
 
+## Usage
+
+### Basic Usage
 ```python
-# Any FastAPI app structure works
 from fastapi import FastAPI
-from src.lib.api.users import router as users_router
-from src.routes.dashboard.data import router as dashboard_router
+import fluidkit
 
 app = FastAPI()
-app.include_router(users_router, prefix="/api")
-app.include_router(dashboard_router, prefix="/api")
+# ... define your routes and models
+
+# Generate TypeScript clients
+fluidkit.integrate(app)
 ```
 
-**SvelteKit Proxy (Auto-configured):**
+### With Options
+```python
+# Mirror strategy (default)
+fluidkit.integrate(app, strategy="mirror")
+
+# Co-locate strategy
+fluidkit.integrate(app, strategy="co-locate") 
+
+# Verbose output
+fluidkit.integrate(app, verbose=True)
+
+# Custom runtime names
+fluidkit.integrate(
+    app,
+    api_result_type="CustomApiResult",
+    get_base_url_fn="customGetBaseUrl"
+)
+```
+
+### Convenience Functions
+```python
+# Introspection only (no file generation)
+fluid_app = fluidkit.introspect_only(app)
+
+# Generate without writing files
+files = fluidkit.generate_only(app, strategy="mirror")
+```
+
+## Generated File Structure
+
+### Mirror Strategy (Default)
+```
+project/
+├── your-fastapi-code.py
+└── .fluidkit/                    # Generated TypeScript
+    ├── your-fastapi-code.ts      # Mirrored structure  
+    └── runtime.ts                # Shared utilities
+```
+
+### Co-locate Strategy  
+```
+project/
+├── your-fastapi-code.py
+├── your-fastapi-code.ts          # Next to Python files
+└── .fluidkit/
+    └── runtime.ts                # Shared utilities
+```
+
+## SvelteKit Integration
+
+FluidKit works seamlessly with SvelteKit's proxy architecture:
+
 ```typescript
-// src/routes/api/[...path]/+server.ts
-export { GET, POST, PUT, DELETE } from '$lib/fluidkit/proxy';
+// Auto-configured: src/routes/api/[...path]/+server.ts
+// Proxies /api/* requests to your FastAPI backend
+
+// Use generated clients anywhere:
+import { get_user } from '$lib/api/users';  // Mirror strategy
+import { get_user } from './api';           // Co-locate strategy
+
+export const load: PageServerLoad = async () => {
+    const result = await get_user(123);
+    return { user: result.data };
+};
 ```
 
 ## Current Status
 
-**🎯 Production Ready**: Complete TypeScript generation pipeline
+**Production Ready Core:**
+- ✅ Runtime introspection of FastAPI apps
+- ✅ Complete TypeScript generation pipeline  
+- ✅ Strategy-based file generation
+- ✅ Import resolution and file writing
+- ✅ Multi-language architecture
 
-**✅ Working:**
-- Full FastAPI → TypeScript client generation
-- Complex type conversion (generics, unions, optionals)
-- Enum support (string & numeric)
-- File-scoped symbol resolution
-- Environment-aware communication
-- Validation constraint documentation
+**Coming Soon:**
+- 🚧 CLI tooling (`fluidkit init`, `fluidkit dev`)
+- 🚧 Project templates and scaffolding
+- 🚧 Watch mode for development
+- 🚧 Additional language support (Python, Zod, JavaScript)
 
-**🚧 Coming Soon:**
-- CLI tooling for project initialization
-- Development server integration
-- Watch mode for automatic regeneration
-- Advanced authentication patterns
+## Requirements
 
-## Quick Start
+- **Python 3.8+** with FastAPI and Pydantic
+- **Node.js** (for TypeScript usage)
 
-<!-- ```bash
-# Generate TypeScript clients from your FastAPI code
-python -m fluidkit.generate src/lib/api/users.py src/routes/dashboard/data.py
+## Installation
 
-# Or process entire directories
-python -m fluidkit.generate src/ --watch
-``` -->
-Try out running test.py
+```bash
+# Currently install from source
+git clone https://github.com/your-org/fluidkit
+cd fluidkit
+pip install -e .
+```
 
-> Note: After CLI implemented we will have a comprehensive documentation
+## Why FluidKit?
 
-<!-- ```typescript
-// Use generated clients immediately
-import { create_user, get_user } from '$lib/api/users';
+**Traditional Approach:**
+- Maintain separate OpenAPI specs
+- Hand-write TypeScript clients  
+- Keep types in sync manually
+- Debug parameter classification issues
 
-const result = await create_user({
-    name: "Alice",
-    email: "alice@example.com"
-});
+**FluidKit Approach:**
+- Write FastAPI normally
+- Run `fluidkit.integrate(app)`
+- Get perfect TypeScript clients
+- Zero maintenance overhead
 
-if (result.success) {
-    console.log("User created:", result.response);
-} else {
-    console.error("Error:", result.error);
-}
-``` -->
-
-## Philosophy
-
-FluidKit believes in **developer freedom** over framework constraints. Whether you prefer:
-- Co-located API routes next to pages (like the original vision)
-- Centralized API layers in lib/ folders (like Next.js)  
-- Domain-driven folder structures
-- Monolithic api.py files
-
-**FluidKit adapts to your workflow**, not the other way around.
-
-**Core Principle**: Write FastAPI the way you want, get TypeScript clients for free.
+FluidKit eliminates the gap between Python backend and TypeScript frontend development. Write your API once, use it everywhere with full type safety.
 
 ---
 
-*FluidKit: Where Python backend meets TypeScript frontend, naturally.*
+**FluidKit: Runtime introspection for seamless full-stack development.**
