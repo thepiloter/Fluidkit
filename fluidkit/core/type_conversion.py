@@ -9,11 +9,13 @@ full recursive support for complex nested types.
 import typing
 import inspect
 from enum import Enum
+from functools import lru_cache
 from typing import Any, Union, get_origin, get_args
 
 from fluidkit.core.schema import FieldAnnotation, BaseType, ContainerType
 
 
+@lru_cache(maxsize=256)
 def python_type_to_field_annotation(py_type: Any) -> FieldAnnotation:
     """
     Convert Python runtime type object to FieldAnnotation.
