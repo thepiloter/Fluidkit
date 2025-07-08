@@ -194,7 +194,7 @@ export async function handleResponse<T = any>(response: Response): Promise<ApiRe
       const errorBody = await response.json();
       error = errorBody.detail || errorBody.message || response.statusText;
     } catch {
-      error = response.statusText || \`HTTP \${status}\`;
+      error = response.statusText || `HTTP ${status}`;
     }
     return { error, status, success: false };
   }

@@ -110,9 +110,11 @@ def _generate_runtime_import_statement(
 ) -> Optional[str]:
     """Generate FluidKit runtime import statement."""
     runtime_path = _get_runtime_import_path(context)
-    runtime_imports = [api_result_type, get_base_url_fn, handle_response_fn]
-    runtime_imports_str = ', '.join(runtime_imports)
-    return f"import {{ {runtime_imports_str} }} from '{runtime_path}';"
+    
+    type_import = f"import type {{ {api_result_type} }} from '{runtime_path}';"
+    value_import = f"import {{ {get_base_url_fn}, {handle_response_fn} }} from '{runtime_path}';"
+
+    return f"{type_import}\n{value_import}"
 
 
 def _calculate_import_path(
