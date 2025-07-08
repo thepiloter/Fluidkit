@@ -165,7 +165,13 @@ def _generate_function_jsdoc(route: RouteNode, method: str) -> str:
     
     # Add parameter documentation
     client_params = _get_client_parameters_for_method(route, method)
-    if client_params:
+
+    # Sort parameters to match function signature
+    required_params = [p for p in client_params if not p.is_optional]
+    optional_params = [p for p in client_params if p.is_optional]
+    sorted_params = required_params + optional_params
+
+    if sorted_params:
         parts.append("")  # Empty line separator
         for param in client_params:
             param_line = f"@param {param.name}"
@@ -213,6 +219,12 @@ def _generate_method_jsdoc(route: RouteNode, method: str) -> str:
     
     # Add parameter documentation
     client_params = _get_client_parameters_for_method(route, method)
+
+    # Sort parameters to match function signature
+    required_params = [p for p in client_params if not p.is_optional]
+    optional_params = [p for p in client_params if p.is_optional]
+    sorted_params = required_params + optional_params
+
     if client_params:
         parts.append("")
         for param in client_params:
@@ -274,10 +286,15 @@ def _wrap_jsdoc(parts: List[str]) -> str:
 def _generate_function_signature(route: RouteNode, method: str, api_result_type: str) -> str:
     """Generate function signature for single-method function."""
     client_params = _get_client_parameters_for_method(route, method)
+
+    # Sort parameters - required first, then optional
+    required_params = [p for p in client_params if not p.is_optional]
+    optional_params = [p for p in client_params if p.is_optional]
+    sorted_params = required_params + optional_params
     
     # Build parameter list
     param_parts = []
-    for param in client_params:
+    for param in sorted_params:
         typescript_type = _convert_annotation_to_typescript(param.annotation, is_top_level=True)
         param_name = param.name
         if param.is_optional:
@@ -301,10 +318,15 @@ def _generate_function_signature(route: RouteNode, method: str, api_result_type:
 def _generate_method_signature(route: RouteNode, method: str, api_result_type: str) -> str:
     """Generate method signature for multi-method object."""
     client_params = _get_client_parameters_for_method(route, method)
+
+    # Sort parameters - required first, then optional
+    required_params = [p for p in client_params if not p.is_optional]
+    optional_params = [p for p in client_params if p.is_optional]
+    sorted_params = required_params + optional_params
     
     # Build parameter list
     param_parts = []
-    for param in client_params:
+    for param in sorted_params:
         typescript_type = _convert_annotation_to_typescript(param.annotation, is_top_level=True)
         param_name = param.name
         if param.is_optional:

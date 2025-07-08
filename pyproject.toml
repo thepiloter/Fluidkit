@@ -31,8 +31,9 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = [
-    "fastapi>=0.115.14",
-    "pydantic>=2.11.7",
+    "fastapi[standard]>=0.115.14",
+    "pydantic-extra-types>=2.10.5",
+    "pydantic[email]>=2.11.7",
 ]
 
 [project.urls]

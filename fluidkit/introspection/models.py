@@ -1,8 +1,9 @@
 """
 Pydantic Model Introspection for FluidKit V2
 
-Discovers and introspects Pydantic models and Enums referenced by FastAPI routes
-using runtime introspection and tree traversal within project boundaries.
+Discovers and introspects Pydantic models referenced by FastAPI routes
+using runtime introspection within project boundaries only.
+External types become 'any' with JSDoc context.
 """
 
 import inspect
@@ -18,28 +19,24 @@ from fluidkit.core.schema import ModelNode, RouteNode, Field, FieldAnnotation, M
 
 def discover_models_from_routes(route_nodes: List[RouteNode], project_root: Optional[str] = None) -> List[ModelNode]:
     """
-    Discover all Pydantic models and Enums referenced by FastAPI routes.
+    Discover Pydantic models referenced by FastAPI routes.
     
-    Uses tree traversal starting from route parameters and return types,
-    recursively discovering nested models within project boundaries.
+    Only introspects project types - external types become 'any'.
     
     Args:
         route_nodes: List of RouteNode objects from FastAPI introspection
         project_root: Project root directory for boundary detection (optional)
         
     Returns:
-        List of discovered ModelNode objects
+        List of discovered ModelNode objects (project types only)
     """
-    discovered = {}  # model_name -> ModelNode (prevent duplicates)
+    discovered = {}
     project_path = Path(project_root).resolve() if project_root else None
     
-    # Start tree traversal from all route entry points
     for route in route_nodes:
-        # Discover from route parameters
         for param in route.parameters:
             _discover_from_field_annotation(param.annotation, discovered, project_path)
         
-        # Discover from return type
         if route.return_type:
             _discover_from_field_annotation(route.return_type, discovered, project_path)
     
@@ -49,85 +46,50 @@ def discover_models_from_routes(route_nodes: List[RouteNode], project_root: Opti
 def _discover_from_field_annotation(annotation: FieldAnnotation, discovered: Dict[str, ModelNode], 
                                   project_path: Optional[Path]):
     """
-    Recursively discover models from a FieldAnnotation using tree traversal.
+    Discover models from FieldAnnotation - project types only.
     
     Args:
         annotation: FieldAnnotation to process
-        discovered: Dictionary to track discovered models (prevents duplicates)
+        discovered: Dictionary to track discovered models
         project_path: Project root path for boundary detection
     """
-    # Process custom types with class references
     if annotation.class_reference and annotation.custom_type:
         model_name = annotation.custom_type
         
-        # Skip if already discovered
         if model_name in discovered:
             return
         
-        # Check project boundary
-        if not _is_within_project_boundary(annotation.class_reference, project_path):
+        cls = annotation.class_reference
+        module_name = cls.__module__
+        
+        from fluidkit.core.utils import classify_module
+        module_type = classify_module(module_name, str(project_path) if project_path else None)
+        
+        # Only introspect project types
+        if module_type != 'project':
             return
         
-        # Introspect the model
-        model_node = _introspect_class_to_model_node(annotation.class_reference)
+        model_node = _introspect_class_to_model_node(cls)
         if model_node:
             discovered[model_name] = model_node
             
-            # Recursively discover from model's fields
             for field in model_node.fields:
                 _discover_from_field_annotation(field.annotation, discovered, project_path)
     
-    # Recursively process generic type arguments
     for arg in annotation.args:
         _discover_from_field_annotation(arg, discovered, project_path)
 
 
-def _is_within_project_boundary(cls: type, project_path: Optional[Path]) -> bool:
-    """
-    Check if a class is defined within the project boundaries.
-    
-    Args:
-        cls: Python class object
-        project_path: Project root path (None = accept all)
-        
-    Returns:
-        True if class is within project boundaries
-    """
-    if project_path is None:
-        return True  # No boundary restriction
-    
-    try:
-        class_file = Path(inspect.getfile(cls)).resolve()
-        return class_file.is_relative_to(project_path)
-    except (TypeError, OSError):
-        return False
-
-
 def _introspect_class_to_model_node(cls: type) -> Optional[ModelNode]:
-    """
-    Convert Python class to ModelNode using runtime introspection.
-    
-    Handles both Pydantic models and Enums.
-    
-    Args:
-        cls: Python class object (BaseModel or Enum)
-        
-    Returns:
-        ModelNode or None if introspection fails
-    """
+    """Convert Python class to ModelNode using runtime introspection."""
     try:
-        # Get location information
-        location = ModuleLocation.from_python_object(cls)
+        from fluidkit.core.utils import create_module_location_from_object
+        location = create_module_location_from_object(cls, is_external=False)
         
-        # Handle Pydantic models
         if _is_pydantic_model(cls):
             return _introspect_pydantic_model(cls, location)
-        
-        # Handle Enums
         elif _is_enum_class(cls):
             return _introspect_enum_model(cls, location)
-        
-        # Skip other types
         else:
             return None
             
@@ -166,22 +128,14 @@ def _introspect_pydantic_model(cls: type, location: ModuleLocation) -> ModelNode
         ModelNode with introspected fields
     """
     fields = []
-    
-    # Get field information (handle both Pydantic V1 and V2)
     model_fields = _get_pydantic_fields(cls)
     
     for field_name, field_info in model_fields.items():
         try:
-            # Extract field annotation
             field_annotation = _extract_field_annotation_from_pydantic_field(cls, field_name, field_info)
-            
-            # Extract default value
             default_value = _extract_default_from_pydantic_field(field_info)
-            
-            # Extract description
             description = _extract_description_from_pydantic_field(field_info)
             
-            # Create Field object
             field_obj = Field(
                 name=field_name,
                 annotation=field_annotation,
@@ -194,7 +148,6 @@ def _introspect_pydantic_model(cls: type, location: ModuleLocation) -> ModelNode
             print(f"Warning: Failed to introspect field {field_name} in {cls.__name__}: {e}")
             continue
     
-    # Extract inheritance information
     inheritance = [base.__name__ for base in cls.__bases__ if base != object]
     
     return ModelNode(
@@ -350,8 +303,6 @@ def _extract_description_from_pydantic_field(field_info: Any) -> Optional[str]:
     return None
 
 
-# === TESTING HELPERS === #
-
 def test_pydantic_introspection():
     """Test Pydantic model introspection with various scenarios."""
     from enum import Enum
@@ -378,7 +329,8 @@ def test_pydantic_introspection():
     print("=== PYDANTIC INTROSPECTION TEST ===")
     
     # Test Enum introspection
-    location = ModuleLocation.from_python_object(UserStatus)
+    from fluidkit.core.utils import create_module_location_from_object
+    location = create_module_location_from_object(UserStatus)
     status_model = _introspect_enum_model(UserStatus, location)
     print(f"UserStatus Enum: {status_model.name}")
     print(f"  Fields: {[f.name for f in status_model.fields]}")
@@ -386,7 +338,7 @@ def test_pydantic_introspection():
     print()
     
     # Test Pydantic model introspection
-    location = ModuleLocation.from_python_object(User)
+    location = create_module_location_from_object(User)
     user_model = _introspect_pydantic_model(User, location)
     print(f"User Model: {user_model.name}")
     print(f"  Fields: {len(user_model.fields)}")
@@ -397,7 +349,6 @@ def test_pydantic_introspection():
         if field.default is not None:
             print(f"      Default: {field.default}")
     print()
-    
 
 
 if __name__ == "__main__":

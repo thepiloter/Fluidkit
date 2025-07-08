@@ -7,13 +7,13 @@ Pure code generation for TypeScript import statements with strategy awareness,
 OS-independent path handling, and configurable FluidKit runtime imports.
 """
 
-
+import os
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Union, Set, Dict, List, Optional
 
+from fluidkit.core.schema import *
 from fluidkit.core.constants import FluidKitRuntime
-from fluidkit.core.schema import RouteNode, ModelNode, ModuleLocation, FluidKitApp
 
 
 @dataclass
@@ -22,220 +22,6 @@ class ImportContext:
     source_location: ModuleLocation
     strategy: str  # "co-locate" or "mirror" 
     project_root: str
-
-
-def analyze_node_references(node: Union[RouteNode, ModelNode]) -> Set[str]:
-    """
-    Extract all custom type names referenced by a node.
-    
-    Args:
-        node: RouteNode or ModelNode to analyze
-        
-    Returns:
-        Set of custom type names (e.g., {"User", "UserStatus"})
-    """
-    return node.get_referenced_types()
-
-
-def resolve_type_locations(
-    referenced_types: Set[str], 
-    fluid_app: FluidKitApp
-) -> Dict[str, ModuleLocation]:
-    """
-    Map type names to their source locations.
-    
-    Args:
-        referenced_types: Set of type names to resolve
-        fluid_app: FluidKitApp containing all discovered models
-        
-    Returns:
-        Dict mapping type_name -> ModuleLocation where it's defined
-    """
-    type_locations = {}
-    
-    for type_name in referenced_types:
-        model = fluid_app.find_model_by_name(type_name)
-        if model:
-            type_locations[type_name] = model.location
-        # Skip types that aren't found (external types become 'any')
-    
-    return type_locations
-
-
-def get_generated_file_path(location: ModuleLocation, strategy: str, project_root: str) -> Path:
-    """
-    Convert ModuleLocation to actual generated TypeScript file path (OS-independent).
-    
-    Args:
-        location: Source module location
-        strategy: "co-locate" or "mirror"
-        project_root: Project root directory
-        
-    Returns:
-        Absolute path to generated TypeScript file
-    """
-    if not location.file_path:
-        raise ValueError(f"ModuleLocation {location.module_path} has no file_path")
-    
-    project_root_path = Path(project_root).resolve()
-    py_file_path = Path(location.file_path).resolve()
-    
-    if strategy == "co-locate":
-        # .py file → .ts file in same location
-        return py_file_path.with_suffix('.ts')
-    
-    elif strategy == "mirror":
-        # .py file → .ts file in .fluidkit mirror structure
-        try:
-            relative_to_project = py_file_path.relative_to(project_root_path)
-            return project_root_path / '.fluidkit' / relative_to_project.with_suffix('.ts')
-        except ValueError:
-            # File is outside project root - fallback to co-locate
-            return py_file_path.with_suffix('.ts')
-    
-    else:
-        raise ValueError(f"Unknown strategy: {strategy}")
-
-
-def calculate_import_path(
-    source_location: ModuleLocation,
-    target_location: ModuleLocation, 
-    context: ImportContext
-) -> Optional[str]:
-    """
-    Calculate relative import path between two locations (strategy-aware, OS-independent).
-    
-    Returns None if types are in same file (no import needed).
-    """
-    try:
-        # Get generated file paths for both locations
-        source_file = get_generated_file_path(source_location, context.strategy, context.project_root)
-        target_file = get_generated_file_path(target_location, context.strategy, context.project_root)
-        
-        # Same file detection
-        if source_file.resolve() == target_file.resolve():
-            return None
-        
-        # Calculate relative path from source directory to target file
-        source_dir = source_file.parent
-        
-        # Use os.path.relpath for proper relative path calculation (works with any paths)
-        import os
-        relative_path = os.path.relpath(target_file, source_dir)
-        
-        # Convert to Path object and remove extension
-        relative_path = Path(relative_path).with_suffix('')
-        
-        # Convert to TypeScript import format
-        import_path = str(relative_path).replace('\\', '/')
-        
-        # Add ./ prefix if needed (TypeScript requires explicit relative imports)
-        if not import_path.startswith('../'):
-            import_path = './' + import_path
-        
-        return import_path
-        
-    except (ValueError, OSError) as e:
-        # Fallback: use module-based path if file path calculation fails
-        print(f"Warning: Failed to calculate import path, using module fallback: {e}")
-        return f"./{target_location.module_path.replace('.', '/')}"
-
-
-def get_fluidkit_runtime_path(context: ImportContext) -> str:
-    """
-    Get import path to FluidKit runtime from source location.
-    
-    Runtime is always at .fluidkit/runtime.ts for both strategies.
-    """
-    try:
-        source_file = get_generated_file_path(context.source_location, context.strategy, context.project_root)
-        runtime_file = Path(context.project_root).resolve() / '.fluidkit' / 'runtime.ts'
-        
-        # Calculate relative path from source directory to runtime
-        source_dir = source_file.parent
-        
-        # Use os.path.relpath for proper relative path calculation
-        import os
-        relative_path = os.path.relpath(runtime_file, source_dir)
-        
-        # Convert to Path object and remove extension
-        relative_path = Path(relative_path).with_suffix('')
-        
-        # Convert to TypeScript import format
-        import_path = str(relative_path).replace('\\', '/')
-        
-        # Add ./ prefix if needed
-        if not import_path.startswith('../'):
-            import_path = './' + import_path
-        
-        return import_path
-        
-    except (ValueError, OSError) as e:
-        # Fallback to reasonable default
-        print(f"Warning: Failed to calculate runtime path, using fallback: {e}")
-        return './.fluidkit/runtime'
-
-
-def generate_type_import_statements(
-    type_locations: Dict[str, ModuleLocation],
-    context: ImportContext
-) -> List[str]:
-    """
-    Generate type import statements with barrel imports.
-    
-    Args:
-        type_locations: Dict mapping type_name -> ModuleLocation
-        context: Import generation context
-        
-    Returns:
-        List of import statements like ["import { User, UserStatus } from './models/user';"]
-    """
-    if not type_locations:
-        return []
-    
-    # Group types by their import paths (barrel imports)
-    imports_by_path: Dict[str, List[str]] = {}
-    
-    for type_name, location in type_locations.items():
-        import_path = calculate_import_path(context.source_location, location, context)
-        
-        # Skip if same file (no import needed)
-        if import_path is None:
-            continue
-        
-        if import_path not in imports_by_path:
-            imports_by_path[import_path] = []
-        imports_by_path[import_path].append(type_name)
-    
-    # Generate import statements
-    import_statements = []
-    for import_path in sorted(imports_by_path.keys()):
-        types = sorted(imports_by_path[import_path])  # Alphabetical order
-        types_str = ', '.join(types)
-        import_statements.append(f"import {{ {types_str} }} from '{import_path}';")
-    
-    return import_statements
-
-
-def generate_runtime_import_statement(
-    context: ImportContext,
-    api_result_type: str = FluidKitRuntime.API_RESULT_TYPE,
-    get_base_url_fn: str = FluidKitRuntime.GET_BASE_URL_FN, 
-    handle_response_fn: str = FluidKitRuntime.HANDLE_RESPONSE_FN
-) -> Optional[str]:
-    """
-    Generate FluidKit runtime import statement.
-    
-    Returns None if runtime imports not needed for this context.
-    """
-    runtime_path = get_fluidkit_runtime_path(context)
-    
-    # Create import statement with configurable names
-    runtime_imports = [api_result_type, get_base_url_fn, handle_response_fn]
-    runtime_imports_str = ', '.join(runtime_imports)
-    
-    return f"import {{ {runtime_imports_str} }} from '{runtime_path}';"
-
 
 def generate_imports_for_file(
     nodes: List[Union[RouteNode, ModelNode]],
@@ -259,29 +45,145 @@ def generate_imports_for_file(
     """
     all_import_statements = []
     
-    # 1. Collect all referenced types from all nodes
+    # Collect all referenced types from all nodes
     all_referenced_types: Set[str] = set()
     for node in nodes:
-        all_referenced_types.update(analyze_node_references(node))
+        all_referenced_types.update(node.get_referenced_types())
     
-    # 2. Resolve type locations
-    type_locations = resolve_type_locations(all_referenced_types, fluid_app)
+    # Resolve type locations (project types only)
+    type_locations = {}
+    for type_name in all_referenced_types:
+        model = fluid_app.find_model_by_name(type_name)
+        if model:  # Only project types will be found
+            type_locations[type_name] = model.location
     
-    # 3. Generate type import statements
-    type_imports = generate_type_import_statements(type_locations, context)
+    # Generate type import statements
+    type_imports = _generate_type_import_statements(type_locations, context)
     all_import_statements.extend(type_imports)
     
-    # 4. Generate runtime import statement if needed
+    # Generate runtime import statement if needed
     if needs_runtime:
-        runtime_import = generate_runtime_import_statement(context, **runtime_config)
+        runtime_import = _generate_runtime_import_statement(context, **runtime_config)
         if runtime_import:
             all_import_statements.append(runtime_import)
     
-    # 5. Join all imports with newlines
     if all_import_statements:
         return '\n'.join(all_import_statements)
     else:
         return ''
+
+
+def _generate_type_import_statements(
+    type_locations: Dict[str, ModuleLocation],
+    context: ImportContext
+) -> List[str]:
+    """Generate type import statements for project types."""
+    if not type_locations:
+        return []
+    
+    imports_by_path: Dict[str, List[str]] = {}
+    
+    for type_name, location in type_locations.items():
+        import_path = _calculate_import_path(context.source_location, location, context)
+        
+        if import_path is None:  # Same file
+            continue
+        
+        if import_path not in imports_by_path:
+            imports_by_path[import_path] = []
+        imports_by_path[import_path].append(type_name)
+    
+    import_statements = []
+    for import_path in sorted(imports_by_path.keys()):
+        types = sorted(imports_by_path[import_path])
+        types_str = ', '.join(types)
+        import_statements.append(f"import {{ {types_str} }} from '{import_path}';")
+    
+    return import_statements
+
+
+def _generate_runtime_import_statement(
+    context: ImportContext,
+    api_result_type: str = FluidKitRuntime.API_RESULT_TYPE,
+    get_base_url_fn: str = FluidKitRuntime.GET_BASE_URL_FN, 
+    handle_response_fn: str = FluidKitRuntime.HANDLE_RESPONSE_FN
+) -> Optional[str]:
+    """Generate FluidKit runtime import statement."""
+    runtime_path = _get_runtime_import_path(context)
+    runtime_imports = [api_result_type, get_base_url_fn, handle_response_fn]
+    runtime_imports_str = ', '.join(runtime_imports)
+    return f"import {{ {runtime_imports_str} }} from '{runtime_path}';"
+
+
+def _calculate_import_path(
+    source_location: ModuleLocation,
+    target_location: ModuleLocation, 
+    context: ImportContext
+) -> Optional[str]:
+    """Calculate relative import path between two project locations."""
+    try:
+        source_file = _get_generated_file_path(source_location, context.strategy, context.project_root)
+        target_file = _get_generated_file_path(target_location, context.strategy, context.project_root)
+        
+        if source_file.resolve() == target_file.resolve():
+            return None
+        
+        source_dir = source_file.parent
+        
+        import os
+        relative_path = os.path.relpath(target_file, source_dir)
+        relative_path = Path(relative_path).with_suffix('')
+        import_path = str(relative_path).replace('\\', '/')
+        
+        if not import_path.startswith('../'):
+            import_path = './' + import_path
+        
+        return import_path
+        
+    except Exception:
+        return f"./{target_location.module_path.replace('.', '/')}"
+
+
+def _get_runtime_import_path(context: ImportContext) -> str:
+    """Get import path to FluidKit runtime."""
+    try:
+        source_file = _get_generated_file_path(context.source_location, context.strategy, context.project_root)
+        runtime_file = Path(context.project_root).resolve() / '.fluidkit' / 'runtime.ts'
+        
+        source_dir = source_file.parent
+        
+        import os
+        relative_path = os.path.relpath(runtime_file, source_dir)
+        relative_path = Path(relative_path).with_suffix('')
+        import_path = str(relative_path).replace('\\', '/')
+        
+        if not import_path.startswith('../'):
+            import_path = './' + import_path
+        
+        return import_path
+        
+    except Exception:
+        return '../.fluidkit/runtime'
+
+
+def _get_generated_file_path(location: ModuleLocation, strategy: str, project_root: str) -> Path:
+    """Convert ModuleLocation to generated TypeScript file path."""
+    if not location.file_path:
+        raise ValueError(f"ModuleLocation {location.module_path} has no file_path")
+    
+    project_root_path = Path(project_root).resolve()
+    py_file_path = Path(location.file_path).resolve()
+    
+    if strategy == "co-locate":
+        return py_file_path.with_suffix('.ts')
+    elif strategy == "mirror":
+        try:
+            relative_to_project = py_file_path.relative_to(project_root_path)
+            return project_root_path / '.fluidkit' / relative_to_project.with_suffix('.ts')
+        except ValueError:
+            return py_file_path.with_suffix('.ts')
+    else:
+        raise ValueError(f"Unknown strategy: {strategy}")
 
 
 # === TESTING HELPERS === #

@@ -175,106 +175,51 @@ class ModuleLocation:
     """
     Module location for distributed generation and import path calculation.
     
-    Replaces AST-based SourceLocation with runtime module introspection.
-    Enables distributed .ts file generation and relative import calculation.
+    Simplified for project-only introspection approach.
     """
     module_path: str                    # "routes.users.page" or "models.user"
     file_path: Optional[str] = None     # "/project/routes/users/page.py" (derived)
-    
-    @classmethod
-    def from_python_object(cls, obj: Any) -> 'ModuleLocation':
-        """
-        Extract location from any Python object (class, function).
-        
-        Args:
-            obj: Python class, function, or any object with __module__
-            
-        Returns:
-            ModuleLocation with module path and derived file path
-        """
-        module_path = getattr(obj, '__module__', 'unknown')
-        file_path = cls._module_to_file_path(module_path, obj)
-        return cls(module_path=module_path, file_path=file_path)
-    
-    @staticmethod
-    def _module_to_file_path(module_path: str, obj: Any) -> Optional[str]:
-        """
-        Convert module path to file path using Python's inspect module.
-        
-        Args:
-            module_path: Python module path like "routes.users.page"
-            obj: The actual Python object for inspection
-            
-        Returns:
-            Absolute file path or None if not determinable
-        """
-        try:
-            # Use inspect to get the actual file path
-            file_path = inspect.getfile(obj)
-            return str(Path(file_path).resolve())
-        except (TypeError, OSError):
-            # Fallback: try to construct from module path
-            try:
-                parts = module_path.split('.')
-                # This is a best-effort reconstruction
-                file_path = Path.cwd()
-                for part in parts:
-                    file_path = file_path / part
-                potential_file = file_path.with_suffix('.py')
-                if potential_file.exists():
-                    return str(potential_file.resolve())
-            except Exception:
-                pass
-        return None
+    is_external: bool = False           # Whether this is an external library module
     
     def get_typescript_file_path(self) -> Optional[str]:
-        """
-        Get corresponding TypeScript file path for distributed generation.
-        
-        Returns:
-            TypeScript file path (.ts) or None if source file path unknown
-        """
+        """Get corresponding TypeScript file path for generation."""
         if self.file_path:
             return self.file_path.replace('.py', '.ts')
         return None
-    
+
     def calculate_relative_import_path(self, target_location: 'ModuleLocation') -> Optional[str]:
-        """
-        Calculate relative import path from this location to target location.
-        
-        Args:
-            target_location: Location of the type being imported
-            
-        Returns:
-            Relative import path like "./models/user" or "../shared/types"
-        """
+        """Calculate relative import path from this location to target location."""
         if not self.file_path or not target_location.file_path:
-            return None
+            return f"./{target_location.module_path.replace('.', '/')}"
         
         try:
             source_path = Path(self.file_path)
             target_path = Path(target_location.file_path)
             
-            # Convert to TypeScript paths
             source_ts_dir = source_path.with_suffix('.ts').parent
             target_ts_file = target_path.with_suffix('.ts')
             
-            # Calculate relative path
-            relative_path = target_ts_file.relative_to(source_ts_dir)
+            import os
+            relative_path = os.path.relpath(target_ts_file, source_ts_dir)
+            relative_path = Path(relative_path).with_suffix('')
+            import_path = str(relative_path).replace('\\', '/')
             
-            # Convert to TypeScript import format
-            import_path = str(relative_path.with_suffix(''))  # Remove .ts
-            import_path = import_path.replace('\\', '/')      # Normalize separators
-            
-            # Add ./ prefix if needed
             if not import_path.startswith('../'):
                 import_path = './' + import_path
             
             return import_path
             
         except (ValueError, OSError):
-            # Fallback: use module-based path
             return f"./{target_location.module_path.replace('.', '/')}"
+
+    def is_same_file(self, other: 'ModuleLocation') -> bool:
+        """Check if two locations represent the same file."""
+        if self.file_path and other.file_path:
+            try:
+                return Path(self.file_path).resolve() == Path(other.file_path).resolve()
+            except (ValueError, OSError):
+                pass
+        return self.module_path == other.module_path
 
 
 # === FIELD SYSTEM === #
@@ -399,6 +344,7 @@ class ModelNode:
     docstring: Optional[str] = None                # Class docstring
     inheritance: List[str] = field(default_factory=list)  # Base class names
     is_enum: bool = False                          # Whether this is an enum
+    metadata: Dict[str, Any] = field(default_factory=dict)      # Additional metadata
     
     def get_referenced_types(self) -> Set[str]:
         """
@@ -424,6 +370,14 @@ class ModelNode:
             True for Pydantic models, False for enums
         """
         return not self.is_enum and 'BaseModel' in self.inheritance
+
+    def is_type_alias(self) -> bool:
+        """Check if this represents a TypeScript type alias."""
+        return self.metadata.get('is_type_alias', False)
+    
+    def get_typescript_type(self) -> Optional[str]:
+        """Get the TypeScript type for type aliases."""
+        return self.metadata.get('typescript_type')
 
 
 @dataclass  
@@ -598,8 +552,11 @@ class FluidKitApp:
                 return model
         return None
     
-    def calculate_imports_for_location(self, location: ModuleLocation, 
-                                     referenced_types: Set[str]) -> Dict[str, List[str]]:
+    def calculate_imports_for_location(
+        self, 
+        location: ModuleLocation, 
+        referenced_types: Set[str]
+    ) -> Dict[str, List[str]]:
         """
         Calculate import statements needed for a specific location.
         
@@ -625,6 +582,30 @@ class FluidKitApp:
 
 
 # === COMPATIBILITY HELPERS === #
+def _calculate_cross_platform_relative_path(target_path: Path, source_dir: Path) -> Optional[Path]:
+    """
+    Calculate relative path between two paths with cross-drive/mount handling.
+    
+    Args:
+        target_path: Target file path
+        source_dir: Source directory path
+        
+    Returns:
+        Relative Path object or None if cross-drive/mount issue
+    """
+    try:
+        # Try Path.relative_to first (most reliable when it works)
+        return target_path.relative_to(source_dir)
+    except ValueError:
+        # Path.relative_to failed - try os.path.relpath
+        try:
+            import os
+            rel_path_str = os.path.relpath(str(target_path), str(source_dir))
+            return Path(rel_path_str)
+        except (ValueError, OSError):
+            # Both methods failed - likely cross-drive on Windows
+            return None
+
 
 def create_fluidkit_app_from_compilation_units(compilation_units: Dict[str, Any]) -> FluidKitApp:
     """

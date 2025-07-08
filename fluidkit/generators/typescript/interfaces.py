@@ -1,8 +1,8 @@
 """
 FluidKit V2 Interface Generator
 
-Generates TypeScript interfaces from V2 ModelNode objects with enhanced enum detection
-and security-aware documentation.
+Generates TypeScript interfaces from V2 ModelNode objects with enhanced enum detection,
+type alias support, and security-aware documentation.
 """
 
 from typing import List
@@ -10,17 +10,7 @@ from fluidkit.core.schema import ModelNode, Field, FieldConstraints, ContainerTy
 
 
 def generate_interface(model: ModelNode) -> str:
-    """
-    Generate TypeScript interface for a single V2 ModelNode.
-    
-    Args:
-        model: V2 ModelNode with fields and metadata
-        
-    Returns:
-        Complete TypeScript interface with JSDoc as string
-    """
-    
-    # Use V2's explicit enum flag instead of heuristic detection
+    """Generate TypeScript interface for a ModelNode."""
     if model.is_enum:
         return _generate_enum(model)
     else:
@@ -28,56 +18,48 @@ def generate_interface(model: ModelNode) -> str:
 
 
 def _generate_interface(model: ModelNode) -> str:
-    """Generate TypeScript interface with conditional JSDoc header."""
+    """Generate TypeScript interface."""
     lines = []
     
-    # Generate JSDoc header only if we have useful information
     header = _generate_interface_header(model)
     if header:
         lines.append(header)
     
-    # Interface declaration
     lines.append(f"export interface {model.name} {{")
     
-    # Generate fields
     for field in model.fields:
         field_lines = _generate_interface_field(field)
         if field_lines:
-            # Add proper indentation for multi-line field JSDoc
             indented_lines = []
             for line in field_lines:
                 indented_lines.append(f"  {line}")
             lines.extend(indented_lines)
     
     lines.append("}")
-    
     return "\n".join(lines)
 
 
 def _generate_interface_header(model: ModelNode) -> str:
-    """Generate interface header with field overview - only if we have useful info."""
+    """Generate interface header with field overview."""
     parts_to_include = []
     
-    # Add model docstring if present
     if model.docstring:
         parts_to_include.append(model.docstring)
     
-    # Add field documentation if any fields have descriptions
     fields_with_descriptions = [f for f in model.fields if f.description]
     if fields_with_descriptions:
-        if model.docstring:  # Add separator if we have docstring
+        if model.docstring:
             parts_to_include.append("")
         
         for field in fields_with_descriptions:
             parts_to_include.append(f"@property {field.name} - {field.description}")
     
-    # Only generate header if we have something useful to say
     if not parts_to_include:
         return ""
     
     lines = ["/**"]
     for part in parts_to_include:
-        if part == "":  # Empty line separator
+        if part == "":
             lines.append(" *")
         else:
             lines.append(f" * {part}")
@@ -87,18 +69,21 @@ def _generate_interface_header(model: ModelNode) -> str:
 
 
 def _generate_interface_field(field: Field) -> List[str]:
-    """
-    Generate single interface field with conditional JSDoc.
-    
-    Returns list of lines (for proper indentation).
-    """
+    """Generate single interface field with JSDoc."""
     lines = []
-    
-    # Collect JSDoc information only if present
     jsdoc_parts = []
     
     if field.description:
         jsdoc_parts.append(field.description)
+    
+    # Add external type context
+    if field.annotation.class_reference:
+        cls = field.annotation.class_reference
+        module_name = cls.__module__
+        
+        from fluidkit.core.utils import classify_module
+        if classify_module(module_name) != 'project':
+            jsdoc_parts.append(f"@external {module_name}.{cls.__name__}")
     
     if field.default is not None:
         if isinstance(field.default, str):
@@ -108,12 +93,10 @@ def _generate_interface_field(field: Field) -> List[str]:
         else:
             jsdoc_parts.append(f"@default {field.default}")
     
-    # Add validation constraints only if they exist
     if field.constraints:
         constraint_docs = _generate_constraint_docs(field.constraints)
         jsdoc_parts.extend(constraint_docs)
     
-    # Only generate JSDoc if we have something useful to say
     if jsdoc_parts:
         if len(jsdoc_parts) == 1:
             lines.append(f"/** {jsdoc_parts[0]} */")
@@ -123,7 +106,6 @@ def _generate_interface_field(field: Field) -> List[str]:
                 lines.append(f" * {part}")
             lines.append(" */")
     
-    # Generate field declaration
     field_name = field.name
     if _is_field_optional(field):
         field_name += "?"
@@ -136,7 +118,7 @@ def _generate_interface_field(field: Field) -> List[str]:
 
 
 def _generate_constraint_docs(constraints: FieldConstraints) -> List[str]:
-    """Generate JSDoc documentation for field constraints - only if present."""
+    """Generate JSDoc documentation for field constraints."""
     docs = []
     
     if constraints.min_value is not None:
@@ -154,7 +136,6 @@ def _generate_constraint_docs(constraints: FieldConstraints) -> List[str]:
     if constraints.regex_pattern:
         docs.append(f"@pattern {constraints.regex_pattern}")
     
-    # Add deprecation warning if marked deprecated
     if constraints.deprecated:
         docs.append("@deprecated")
     
@@ -162,24 +143,21 @@ def _generate_constraint_docs(constraints: FieldConstraints) -> List[str]:
 
 
 def _generate_enum(model: ModelNode) -> str:
-    """Generate TypeScript enum with conditional JSDoc."""
+    """Generate TypeScript enum."""
     lines = []
     
-    # Generate JSDoc header only if useful
-    header = _generate_interface_header(model)  # Reuse interface header logic
+    header = _generate_interface_header(model)
     if header:
         lines.append(header)
     
     lines.append(f"export enum {model.name} {{")
     
-    # Generate enum fields
     for field in model.fields:
         field_line = _generate_enum_field(field)
         if field_line:
             lines.append(f"  {field_line}")
     
     lines.append("}")
-    
     return "\n".join(lines)
 
 
@@ -192,13 +170,17 @@ def _generate_enum_field(field: Field) -> str:
         return f"{field.name} = {field.default},"
 
 
-# === TYPE CONVERSION (Unchanged from V1 - works with FieldAnnotation) === #
-
 def _convert_annotation_to_typescript(annotation, is_top_level: bool = False) -> str:
-    """Convert V2 FieldAnnotation to TypeScript type string."""
+    """Convert FieldAnnotation to TypeScript type string."""
     if annotation.container:
         return _convert_container_type(annotation, is_top_level)
     elif annotation.custom_type:
+        # External types become 'any', project types keep their name
+        if annotation.class_reference:
+            from fluidkit.core.utils import classify_module
+            module_name = annotation.class_reference.__module__
+            if classify_module(module_name) != 'project':
+                return "any"
         return annotation.custom_type
     elif annotation.base_type:
         return _convert_base_type(annotation.base_type)
@@ -241,7 +223,6 @@ def _convert_array_type(annotation) -> str:
     """Convert List[T] to T[]."""
     if annotation.args:
         inner_type = _convert_annotation_to_typescript(annotation.args[0], is_top_level=False)
-        # Smart parentheses for complex union types
         if "|" in inner_type or "&" in inner_type:
             return f"({inner_type})[]"
         else:
@@ -300,21 +281,15 @@ def _convert_tuple_type(annotation) -> str:
 
 
 def _convert_optional_type(annotation, is_top_level: bool = False) -> str:
-    """
-    Convert Optional[T] to T (top-level) or T | null (nested).
-    """
+    """Convert Optional[T] to T (top-level) or T | null (nested)."""
     if annotation.args:
         inner_type = _convert_annotation_to_typescript(annotation.args[0], is_top_level=False)
         if is_top_level:
-            # Top-level Optional[T] becomes just T (with ? in field name)
             return inner_type
         else:
-            # Nested Optional[T] becomes T | null
             return f"{inner_type} | null"
     return "any"
 
-
-# === UTILITIES === #
 
 def _escape_typescript_string(value: str) -> str:
     """Escape string literals for TypeScript."""
@@ -324,12 +299,10 @@ def _escape_typescript_string(value: str) -> str:
 def _is_field_optional(field: Field) -> bool:
     """Determine if field should be optional in TypeScript."""
     return (
-        field.is_optional or  # Has default value
-        field.annotation.is_optional()  # Is Optional[T] or Union with None
+        field.is_optional or
+        field.annotation.is_optional()
     )
 
-
-# === TESTING HELPER === #
 
 def test_v2_interface_generator():
     """Test V2 interface generator with various ModelNode scenarios."""
@@ -338,7 +311,7 @@ def test_v2_interface_generator():
     # Create test location
     location = ModuleLocation(module_path="test.models", file_path="/test/models.py")
     
-    # === TEST 1: Simple Interface ===
+    # Test 1: Simple Interface
     print("=== TEST 1: Simple Interface ===")
     simple_user = ModelNode(
         name="User",
@@ -371,7 +344,7 @@ def test_v2_interface_generator():
     print(result)
     print("\n" + "="*50 + "\n")
     
-    # === TEST 2: Enum ===
+    # Test 2: Enum
     print("=== TEST 2: Enum ===")
     status_enum = ModelNode(
         name="UserStatus",
@@ -390,15 +363,31 @@ def test_v2_interface_generator():
         location=location,
         docstring="User status enumeration",
         inheritance=["Enum"],
-        is_enum=True  # V2 explicit enum flag
+        is_enum=True
     )
     
     result = generate_interface(status_enum)
     print(result)
     print("\n" + "="*50 + "\n")
     
-    # === TEST 3: Complex Types with Constraints ===
-    print("=== TEST 3: Complex Types with Constraints ===")
+    # Test 3: Type Alias
+    print("=== TEST 3: Type Alias ===")
+    email_alias = ModelNode(
+        name="EmailStr",
+        fields=[],
+        location=location,
+        docstring="Type alias for EmailStr",
+        inheritance=[],
+        is_enum=False,
+        metadata={'is_type_alias': True, 'typescript_type': 'any'}
+    )
+    
+    result = generate_interface(email_alias)
+    print(result)
+    print("\n" + "="*50 + "\n")
+    
+    # Test 4: Complex Types with Constraints
+    print("=== TEST 4: Complex Types with Constraints ===")
     validated_user = ModelNode(
         name="ValidatedUser",
         fields=[
@@ -437,32 +426,6 @@ def test_v2_interface_generator():
     )
     
     result = generate_interface(validated_user)
-    print(result)
-    print("\n" + "="*50 + "\n")
-    
-    # === TEST 4: Model with No Descriptions (minimal JSDoc) ===
-    print("=== TEST 4: Model with No Descriptions ===")
-    minimal_model = ModelNode(
-        name="MinimalUser",
-        fields=[
-            Field(
-                name="id",
-                annotation=FieldAnnotation(base_type=BaseType.NUMBER),
-                default=None
-            ),
-            Field(
-                name="name",
-                annotation=FieldAnnotation(base_type=BaseType.STRING),
-                default="test"
-            )
-        ],
-        location=location,
-        inheritance=["BaseModel"],
-        is_enum=False
-        # No docstring, no field descriptions
-    )
-    
-    result = generate_interface(minimal_model)
     print(result)
 
 
