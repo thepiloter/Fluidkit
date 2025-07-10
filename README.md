@@ -89,7 +89,7 @@ export const load: PageServerLoad = async () => {
 
 ```bash
 # Install directly from GitHub
-pip install git+https://github.com/AswanthManoj/Fluidkit.git
+pip install fluidkit
 ```
 
 ## Quick Start
