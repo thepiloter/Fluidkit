@@ -155,11 +155,6 @@ wheels = [
 name = "fluidkit"
 version = "0.1.2"
 source = { editable = "." }
-dependencies = [
-    { name = "fastapi", extra = ["standard"] },
-    { name = "pydantic", extra = ["email"] },
-    { name = "pydantic-extra-types" },
-]
 
 [package.optional-dependencies]
 dev = [
@@ -170,11 +165,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fastapi", extras = ["standard"], specifier = ">=0.115.14" },
     { name = "fastapi", extras = ["standard"], marker = "extra == 'dev'", specifier = ">=0.115.14" },
-    { name = "pydantic", extras = ["email"], specifier = ">=2.11.7" },
     { name = "pydantic", extras = ["email"], marker = "extra == 'dev'", specifier = ">=2.11.7" },
-    { name = "pydantic-extra-types", specifier = ">=2.10.5" },
     { name = "pydantic-extra-types", marker = "extra == 'dev'", specifier = ">=2.10.5" },
 ]
 
