@@ -1,5 +1,9 @@
 # FluidKit
 
+<div style="text-align: center;">
+  <img src="./icon.svg" alt="FluidKit Logo" width="120" height="120">
+</div>
+
 **Automatic TypeScript client generation for FastAPI through runtime introspection. Get tRPC-like developer experience with full-stack type safety across Python and TypeScript.**
 
 ## Overview
