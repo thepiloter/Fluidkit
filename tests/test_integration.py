@@ -2,8 +2,9 @@
 End-to-end integration tests using the test FastAPI app
 """
 
+import tempfile
 from pathlib import Path
-from tests.app import app
+from tests.sample.app import app
 from fluidkit.core.integrator import integrate, introspect_only, generate_only
 
 
@@ -115,7 +116,7 @@ def test_language_parameter_validation():
     
     for lang in valid_languages:
         try:
-            fluid_app, files = integrate(app, lang=lang)
+            fluid_app, files = integrate(app, lang=lang, project_root=None)
             print(f"  Language '{lang}': OK")
         except Exception as e:
             print(f"  Language '{lang}': Failed - {e}")
@@ -130,6 +131,53 @@ def test_language_parameter_validation():
         print(f"  Language 'invalid': Unexpected error - {e}")
 
 
+def test_target_field_functionality():
+    """Test target field in configuration"""
+    import tempfile
+    import json
+    from fluidkit.core.config import load_fluidkit_config
+    
+    print("=== TARGET FIELD TEST ===")
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        config_path = Path(temp_dir) / "fluid.config.json"
+        
+        # Test config with target
+        config_data = {
+            "target": "production",
+            "environments": {
+                "development": {
+                    "mode": "unified",
+                    "apiUrl": "/api"
+                },
+                "production": {
+                    "mode": "separate", 
+                    "apiUrl": "https://api.example.com"
+                }
+            }
+        }
+        
+        with open(config_path, 'w') as f:
+            json.dump(config_data, f)
+        
+        config = load_fluidkit_config(temp_dir)
+        
+        print(f"Target: {config.target}")
+        print(f"Target environment: {config.get_environment(config.target)}")
+        
+        # Test integration with target
+        fluid_app, files = integrate(app, project_root=temp_dir)
+        
+        # Check that runtime.ts uses production settings
+        runtime_files = [f for f in files.keys() if 'runtime.ts' in f]
+        if runtime_files:
+            runtime_content = files[runtime_files[0]]
+            if "https://api.example.com" in runtime_content:
+                print("✅ Runtime correctly uses production URL")
+            else:
+                print("❌ Runtime doesn't use production URL")
+
+
 def run_integration_tests():
     """Run all integration tests"""
     test_end_to_end_typescript_generation()
@@ -137,6 +185,7 @@ def run_integration_tests():
     test_file_writing_and_headers()
     test_convenience_functions()
     test_language_parameter_validation()
+    test_target_field_functionality()
     print("\nIntegration tests completed")
 
 

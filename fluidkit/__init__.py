@@ -5,7 +5,7 @@ FluidKit - Automatic TypeScript client code generation for FastAPI
 __version__ = "2.0.0"
 
 def _check_dependencies():
-    """Check for required dependencies and provide helpful error messages"""
+    """Check for required dependencies"""
     missing = []
     
     try:
