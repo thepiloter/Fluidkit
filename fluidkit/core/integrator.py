@@ -56,8 +56,22 @@ def integrate(
     config = load_fluidkit_config(project_root)
     
     # Override config with explicit parameters (backward compatibility)
-    if 'strategy' in options:
-        config.output.strategy = options['strategy']
+    config_overrides = {
+        'strategy': options.pop('strategy', None),
+        'target': options.pop('target', None),
+        'framework': options.pop('framework', None),
+    }
+
+    # Apply config overrides
+    if config_overrides['strategy']:
+        config.output.strategy = config_overrides['strategy']
+    if config_overrides['target']:
+        config.target = config_overrides['target']
+    if config_overrides['framework']:
+        config.framework = config_overrides['framework']
+    
+    # Remaining options are runtime config
+    runtime_config = options
     
     if verbose:
         logger.info("Starting FluidKit integration")
@@ -65,6 +79,7 @@ def integrate(
         logger.debug(f"Config framework: {config.framework}")
         logger.debug(f"Output strategy: {config.output.strategy}")
         logger.debug(f"Output location: {config.output.location}")
+        logger.debug(f"Target: {config.target}")
     
     # Collect and convert routes
     api_routes = _collect_fastapi_routes(app)
@@ -81,7 +96,7 @@ def integrate(
         metadata={
             'project_root': project_root,
             'config': config,
-            **options
+            **runtime_config
         }
     )
     
@@ -93,7 +108,7 @@ def integrate(
     normalized_lang = _normalize_language(target_lang)
     
     if normalized_lang == LanguageType.TYPESCRIPT:
-        generated_files = _generate_and_write_typescript(fluid_app, config, verbose, **options)
+        generated_files = _generate_and_write_typescript(fluid_app, config, verbose, **runtime_config)
         
         if not verbose:
             file_count = len(generated_files)
