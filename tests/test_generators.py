@@ -2,6 +2,7 @@
 Code generation tests for TypeScript interfaces, clients, and imports
 """
 
+from fluidkit.core.config import FluidKitConfig, OutputConfig
 from fluidkit.generators.typescript.interfaces import generate_interface
 from fluidkit.generators.typescript.clients import generate_fetch_wrapper
 from fluidkit.generators.typescript.imports import generate_imports_for_file, ImportContext
@@ -192,12 +193,16 @@ def test_import_statement_generation():
     for strategy in strategies:
         print(f"\nTesting {strategy.upper()} Strategy")
         
+        config = FluidKitConfig(
+            target="development",
+            output=OutputConfig(strategy=strategy, location=".fluidkit")
+        )
         context = ImportContext(
             source_location=route_location,
-            strategy=strategy,
+            config=config,
             project_root="/project"
         )
-        
+
         # Test type imports only
         print("Type imports only:")
         imports = generate_imports_for_file(

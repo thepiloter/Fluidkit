@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
 
+from fluidkit.core.utils import create_module_location_from_object
 from fluidkit.core.schema import ModuleLocation, FieldAnnotation, BaseType
 from fluidkit.introspection.models import _introspect_pydantic_model, _introspect_enum_model
 
@@ -32,7 +33,7 @@ def test_pydantic_model_introspection():
     print("=== PYDANTIC INTROSPECTION TEST ===")
     
     # Test Enum introspection
-    location = ModuleLocation.from_python_object(UserStatus)
+    location = create_module_location_from_object(UserStatus, is_external=False)
     status_model = _introspect_enum_model(UserStatus, location)
     print(f"UserStatus Enum: {status_model.name}")
     print(f"  Fields: {[f.name for f in status_model.fields]}")
@@ -40,7 +41,7 @@ def test_pydantic_model_introspection():
     print()
     
     # Test Pydantic model introspection
-    location = ModuleLocation.from_python_object(User)
+    location = create_module_location_from_object(User, is_external=False)
     user_model = _introspect_pydantic_model(User, location)
     print(f"User Model: {user_model.name}")
     print(f"  Fields: {len(user_model.fields)}")

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fluidkit"
-version = "0.1.1"
+version = "0.1.2"
 description = "Automatic TypeScript client generation for FastAPI through runtime introspection"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,7 +27,11 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
-dependencies = []
+dependencies = [
+    "fastapi[standard]>=0.115.14",
+    "pydantic-extra-types>=2.10.5",
+    "pydantic[email]>=2.11.7",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -40,9 +44,10 @@ dev = [
 Homepage = "https://github.com/AswanthManoj/Fluidkit"
 Repository = "https://github.com/AswanthManoj/Fluidkit"
 Issues = "https://github.com/AswanthManoj/Fluidkit/issues"
+Documentation = "https://github.com/AswanthManoj/Fluidkit#readme"
 
 [tool.setuptools.packages.find]
 include = ["fluidkit*"]
 
 [tool.setuptools.package-data]
-fluidkit = ["runtimes/**/*.ts", "runtimes/**/*.js", "runtimes/**/*.py"]
+fluidkit = ["templates/**/*", "runtimes/**/*.ts", "runtimes/**/*.js", "runtimes/**/*.py"]

@@ -46,7 +46,31 @@ def classify_module(module_name: str, project_root: Optional[str] = None) -> Mod
     if module_name in sys.builtin_module_names:
         return 'builtin'
     
-    # 2. Get module spec using Python's import mechanism
+    # 2. Special case for __main__ - context-aware detection
+    if module_name == '__main__':
+        try:
+            import __main__
+            if hasattr(__main__, '__file__') and __main__.__file__:
+                main_file = Path(__main__.__file__).resolve()
+                
+                # Check if main script is within project boundaries
+                try:
+                    main_file.relative_to(project_root)
+                    
+                    # Additional validation: ensure it's not in external paths via sys.path
+                    if not _is_external_via_syspath(main_file, project_root):
+                        return 'project'
+                except ValueError:
+                    # Main script is outside project root
+                    pass
+        except (AttributeError, OSError):
+            # Can't determine main file location
+            pass
+        
+        # If we can't validate __main__ as project code, treat as external
+        return 'external'
+    
+    # 3. Get module spec using Python's import mechanism
     try:
         spec = importlib.util.find_spec(module_name)
     except (ImportError, ValueError, ModuleNotFoundError):
@@ -55,11 +79,11 @@ def classify_module(module_name: str, project_root: Optional[str] = None) -> Mod
     if spec is None:
         return 'not_found'
     
-    # 3. Check if it's an installed package (most reliable for external detection)
+    # 4. Check if it's an installed package (most reliable for external detection)
     if _is_installed_package(module_name):
         return 'external'
     
-    # 4. Handle modules with file origins
+    # 5. Handle modules with file origins
     if spec.origin:
         module_path = Path(spec.origin).resolve()
         
@@ -76,7 +100,7 @@ def classify_module(module_name: str, project_root: Optional[str] = None) -> Mod
         except ValueError:
             pass  # Module is outside project root
     
-    # 5. Handle namespace packages and modules without file origin
+    # 6. Handle namespace packages and modules without file origin
     if spec.submodule_search_locations:
         locations = [Path(loc).resolve() for loc in spec.submodule_search_locations]
         for loc in locations:
