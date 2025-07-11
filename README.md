@@ -1,7 +1,7 @@
 # FluidKit
 
 <div align="center">
-  <img src="./icon.svg" alt="FluidKit Logo" width="125">
+  <img src="https://azure-deliberate-dog-514.mypinata.cloud/ipfs/bafkreiay74jzankyzj2zh4zemmpidafbsrcr4hwjxnl5e3qk32xyi6t3hi" alt="FluidKit Logo" width="125">
 </div>
 
 **Automatic TypeScript client generation for FastAPI through runtime introspection. Get tRPC-like developer experience with full-stack type safety across Python and TypeScript.** 
