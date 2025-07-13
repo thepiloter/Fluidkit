@@ -81,18 +81,7 @@ def generate_typescript_files(
     
     # Cleanup stale files after we know what we're generating
     if previous_manifest:
-        current_files = set(generated_files.keys())
-        previous_files = set(previous_manifest.get("generatedFiles", []))
-        stale_files = previous_files - current_files
-        
-        for stale_file in stale_files:
-            if not stale_file.endswith(".manifest.json"):
-                path_obj = Path(stale_file)
-                if path_obj.exists():
-                    try:
-                        path_obj.unlink()
-                    except Exception:
-                        pass
+        _cleanup_stale_files(previous_manifest, generated_files)
     
     return generated_files
 
@@ -320,191 +309,92 @@ def _generate_proxy_files(config: FluidKitConfig, project_root: str) -> Dict[str
 
 
 def _generate_sveltekit_proxy(env_config, project_root: str, config: FluidKitConfig) -> Dict[str, str]:
-    """Generate SvelteKit API proxy route."""
+    """Generate a transparent SvelteKit API proxy route."""
     # Extract API path from URL (e.g., "/api" -> "api")
     api_path = env_config.apiUrl.lstrip('/')
     
     # Generate proxy route path
     proxy_route_path = Path(project_root) / "src" / "routes" / api_path / "[...path]" / "+server.ts"
     
-    proxy_content = f'''import type {{ RequestHandler }} from './$types';
+    proxy_content = f'''import type {{ RequestHandler, RequestEvent }} from '@sveltejs/kit';
 
-const FASTAPI_URL = 'http://{config.backend.host}:{config.backend.port}';
+const FASTAPI_URL = '{config.backend.scheme}://{config.backend.host}:{config.backend.port}';
 
-export const GET: RequestHandler = async ({{ params, url, request }}) => {{
-  const apiPath = params.path;
-  const searchParams = url.searchParams.toString();
-  const fullUrl = `${{FASTAPI_URL}}/${{apiPath}}${{searchParams ? `?${{searchParams}}` : ''}}`;
-  
-  const response = await fetch(fullUrl, {{
-    method: 'GET',
-    headers: {{
-      'content-type': request.headers.get('content-type') || '',
-      'authorization': request.headers.get('authorization') || '',
+// Only skip headers that would BREAK the request
+const SKIP_HEADERS = new Set<string>([
+    'host'  // Would point to SvelteKit instead of FastAPI
+]);
+
+/**
+ * Transparent proxy - forwards requests to FastAPI as-is
+ * Preserves: streaming, FormData, JSON, auth headers, CORS, etc.
+ */
+async function proxyRequest(event: RequestEvent): Promise<Response> {{
+    const {{ params, request, url }} = event;
+    const path = params.path || '';
+    const backendUrl = `${{FASTAPI_URL}}/${{path}}${{url.search}}`;
+    
+    // Forward headers as-is (except problematic ones)
+    const headers = new Headers();
+    for (const [key, value] of request.headers) {{
+        if (!SKIP_HEADERS.has(key.toLowerCase())) {{
+            headers.set(key, value);
+        }}
     }}
-  }});
-  
-  return response;
-}};
-
-export const POST: RequestHandler = async ({{ params, request }}) => {{
-  const apiPath = params.path;
-  const fullUrl = `${{FASTAPI_URL}}/${{apiPath}}`;
-  
-  const response = await fetch(fullUrl, {{
-    method: 'POST',
-    headers: {{
-      'content-type': request.headers.get('content-type') || '',
-      'authorization': request.headers.get('authorization') || '',
-    }},
-    body: await request.text()
-  }});
-  
-  return response;
-}};
-
-export const PUT: RequestHandler = async ({{ params, request }}) => {{
-  const apiPath = params.path;
-  const fullUrl = `${{FASTAPI_URL}}/${{apiPath}}`;
-  
-  const response = await fetch(fullUrl, {{
-    method: 'PUT',
-    headers: {{
-      'content-type': request.headers.get('content-type') || '',
-      'authorization': request.headers.get('authorization') || '',
-    }},
-    body: await request.text()
-  }});
-  
-  return response;
-}};
-
-export const DELETE: RequestHandler = async ({{ params, request }}) => {{
-  const apiPath = params.path;
-  const fullUrl = `${{FASTAPI_URL}}/${{apiPath}}`;
-  
-  const response = await fetch(fullUrl, {{
-    method: 'DELETE',
-    headers: {{
-      'content-type': request.headers.get('content-type') || '',
-      'authorization': request.headers.get('authorization') || '',
+    
+    try {{
+        // Forward request exactly as received
+        const response = await fetch(backendUrl, {{
+            method: request.method,
+            headers,
+            body: request.body,      // Preserves FormData, JSON, binary, streams
+            signal: request.signal   // Preserves cancellation
+        }});
+        
+        // Optional development logging
+        if (import.meta.env.DEV) {{
+            console.log(`🔄 ${{request.method}} /{api_path}/${{path}} → ${{response.status}} ${{response.statusText}}`);
+        }}
+        
+        // Return response exactly as received from FastAPI
+        return response;
+        
+    }} catch (error) {{
+        // Only catch NETWORK failures (server down, timeout, etc.)
+        // HTTP 4xx/5xx errors are valid responses, not exceptions
+        console.error('FastAPI network error:', {{
+            url: backendUrl,
+            method: request.method,
+            error: error instanceof Error ? error.message : 'Unknown error'
+        }});
+        
+        return new Response('Backend service unavailable', {{
+            status: 502,
+            statusText: 'Bad Gateway',
+            headers: {{
+                'Content-Type': 'text/plain'
+            }}
+        }});
     }}
-  }});
-  
-  return response;
-}};
+}}
 
-export const PATCH: RequestHandler = async ({{ params, request }}) => {{
-  const apiPath = params.path;
-  const fullUrl = `${{FASTAPI_URL}}/${{apiPath}}`;
-  
-  const response = await fetch(fullUrl, {{
-    method: 'PATCH',
-    headers: {{
-      'content-type': request.headers.get('content-type') || '',
-      'authorization': request.headers.get('authorization') || '',
-    }},
-    body: await request.text()
-  }});
-  
-  return response;
-}};'''
+// All HTTP methods use the same transparent proxy logic
+export const GET: RequestHandler = proxyRequest;
+export const POST: RequestHandler = proxyRequest;
+export const PUT: RequestHandler = proxyRequest;
+export const PATCH: RequestHandler = proxyRequest;
+export const DELETE: RequestHandler = proxyRequest;
+export const OPTIONS: RequestHandler = proxyRequest;
+export const HEAD: RequestHandler = proxyRequest;
+'''
 
     return {str(proxy_route_path): proxy_content}
 
 
 def _generate_nextjs_proxy(env_config, project_root: str, config: FluidKitConfig) -> Dict[str, str]:
     """Generate Next.js API proxy route."""
-    # Extract API path from URL
-    api_path = env_config.apiUrl.lstrip('/')
-    
-    # Generate proxy route path for Next.js App Router
-    proxy_route_path = Path(project_root) / "app" / api_path / "[...path]" / "route.ts"
-    
-    proxy_content = f'''import {{ NextRequest }} from 'next/server';
-
-const FASTAPI_URL = 'http://{config.backend.host}:{config.backend.port}';
-
-export async function GET(request: NextRequest, {{ params }}: {{ params: {{ path: string[] }} }}) {{
-  const apiPath = params.path.join('/');
-  const searchParams = request.nextUrl.searchParams.toString();
-  const fullUrl = `${{FASTAPI_URL}}/${{apiPath}}${{searchParams ? `?${{searchParams}}` : ''}}`;
-  
-  const response = await fetch(fullUrl, {{
-    method: 'GET',
-    headers: {{
-      'content-type': request.headers.get('content-type') || '',
-      'authorization': request.headers.get('authorization') || '',
-    }}
-  }});
-  
-  return response;
-}}
-
-export async function POST(request: NextRequest, {{ params }}: {{ params: {{ path: string[] }} }}) {{
-  const apiPath = params.path.join('/');
-  const fullUrl = `${{FASTAPI_URL}}/${{apiPath}}`;
-  
-  const response = await fetch(fullUrl, {{
-    method: 'POST',
-    headers: {{
-      'content-type': request.headers.get('content-type') || '',
-      'authorization': request.headers.get('authorization') || '',
-    }},
-    body: await request.text()
-  }});
-  
-  return response;
-}}
-
-export async function PUT(request: NextRequest, {{ params }}: {{ params: {{ path: string[] }} }}) {{
-  const apiPath = params.path.join('/');
-  const fullUrl = `${{FASTAPI_URL}}/${{apiPath}}`;
-  
-  const response = await fetch(fullUrl, {{
-    method: 'PUT',
-    headers: {{
-      'content-type': request.headers.get('content-type') || '',
-      'authorization': request.headers.get('authorization') || '',
-    }},
-    body: await request.text()
-  }});
-  
-  return response;
-}}
-
-export async function DELETE(request: NextRequest, {{ params }}: {{ params: {{ path: string[] }} }}) {{
-  const apiPath = params.path.join('/');
-  const fullUrl = `${{FASTAPI_URL}}/${{apiPath}}`;
-  
-  const response = await fetch(fullUrl, {{
-    method: 'DELETE',
-    headers: {{
-      'content-type': request.headers.get('content-type') || '',
-      'authorization': request.headers.get('authorization') || '',
-    }}
-  }});
-  
-  return response;
-}}
-
-export async function PATCH(request: NextRequest, {{ params }}: {{ params: {{ path: string[] }} }}) {{
-  const apiPath = params.path.join('/');
-  const fullUrl = `${{FASTAPI_URL}}/${{apiPath}}`;
-  
-  const response = await fetch(fullUrl, {{
-    method: 'PATCH',
-    headers: {{
-      'content-type': request.headers.get('content-type') || '',
-      'authorization': request.headers.get('authorization') || '',
-    }},
-    body: await request.text()
-  }});
-  
-  return response;
-}}'''
-
-    return {str(proxy_route_path): proxy_content}
+    # TODO: Implement proying for Next.js
+    pass
 
 
 def _load_previous_manifest(config: FluidKitConfig, project_root: str) -> Optional[Dict]:
@@ -520,18 +410,20 @@ def _load_previous_manifest(config: FluidKitConfig, project_root: str) -> Option
     return None
 
 
-def _cleanup_stale_files(previous_manifest: Dict):
+def _cleanup_stale_files(previous_manifest: Dict, generated_files: Dict[str, str]):
     """Remove files that were generated previously but not in current generation."""
-    for file_path in previous_manifest.get("generatedFiles", []):
-        if file_path.endswith(".manifest.json"):
-            continue  # Don't delete manifest itself
+    current_files = set(generated_files.keys())
+    previous_files = set(previous_manifest.get("generatedFiles", []))
+    stale_files = previous_files - current_files
         
-        path_obj = Path(file_path)
-        if path_obj.exists():
-            try:
-                path_obj.unlink()
-            except Exception:
-                pass  # Silent cleanup
+    for stale_file in stale_files:
+        if not stale_file.endswith(".manifest.json"):
+            path_obj = Path(stale_file)
+            if path_obj.exists():
+                try:
+                    path_obj.unlink()
+                except Exception:
+                    pass
 
 
 def _create_generation_manifest(
