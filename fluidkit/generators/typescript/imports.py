@@ -337,7 +337,7 @@ def test_imports():
         except Exception as e:
             print(f"✗ {source_py} → {target_py}: FAILED - {e}")
     
-    print("\n✅ import tests completed!")
+    print("\nimport tests completed!")
 
 
 def test_config_driven_imports():
@@ -430,7 +430,7 @@ def test_config_driven_imports():
             )
             print(f"  {imports}")
     
-    print("\n✅ All config-driven import tests passed!")
+    print("\nAll config-driven import tests passed!")
 
 
 if __name__ == "__main__":

@@ -8,8 +8,8 @@ import sys
 import hashlib
 import importlib.util
 from pathlib import Path
-from typing import List, Tuple, Dict, Any
 from fnmatch import fnmatch
+from typing import List, Tuple, Dict, Any
 from fastapi import FastAPI, APIRouter
 
 from fluidkit.core.config import FluidKitConfig
@@ -48,7 +48,7 @@ def auto_discover_and_bind_routes(app: FastAPI, config: FluidKitConfig, project_
             
             if not routers:
                 if verbose:
-                    print(f"⚠️ No APIRouters found in {file_path}")
+                    print(f"No APIRouters found in {file_path}")
                 continue
             
             # Bind each router to FastAPI app (no prefix - predictable behavior)
@@ -63,12 +63,10 @@ def auto_discover_and_bind_routes(app: FastAPI, config: FluidKitConfig, project_
                 })
                 
                 if verbose:
-                    print(f"✅ Bound {router_var_name} from {file_path} ({len(router_instance.routes)} routes)")
+                    print(f"Bound {router_var_name} from {file_path} ({len(router_instance.routes)} routes)")
         
         except Exception as e:
-            if verbose:
-                print(f"❌ Failed to import {file_path}: {e}")
-            continue
+            raise ImportError(f"Failed to import auto-discovered file {file_path}: {e}") from e
     
     if discovery_results and not verbose:
         total_routers = len(discovery_results)
@@ -269,7 +267,7 @@ def test_autodiscovery():
     
     print(f"\nTotal FastAPI routes after auto-discovery: {len(app.routes)}")
     
-    print("\n✅ Auto-discovery test completed!")
+    print("\nAuto-discovery test completed!")
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, Literal, List
 
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 def get_version() -> str:
     return __version__
@@ -382,7 +382,7 @@ def test_config_management():
         print(f"   File pattern: {auto_config.autoDiscovery.filePattern}")
         print(f"   Include paths: {auto_config.include}")
         
-        print("\n✅ All config management tests passed!")
+        print("\nAll config management tests passed!")
 
 
 if __name__ == "__main__":

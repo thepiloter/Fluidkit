@@ -176,7 +176,7 @@ def _write_generated_files(generated_files: Dict[str, str], verbose: bool):
             if verbose:
                 logger.error(error_msg)
             else:
-                print(f"❌ {error_msg}")
+                print(error_msg)
 
 
 def _get_file_header(file_extension: str) -> str:
@@ -356,12 +356,12 @@ def test_integration():
         print("\n3. Introspection only:")
         fluid_app = introspect_only(app)
         
-        print("\n✅ All integration tests passed!")
+        print("\nAll integration tests passed!")
         
     except ImportError:
-        print("❌ Could not import test app - ensure test files exist")
+        print("Could not import test app - ensure test files exist")
     except Exception as e:
-        print(f"❌ Test failed: {e}")
+        print(f"Test failed: {e}")
         import traceback
         traceback.print_exc()
 
