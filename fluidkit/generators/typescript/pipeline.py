@@ -480,7 +480,7 @@ def test_config_driven_generation():
         
         print(f"Generated {len(files)} files:")
         for file_path in sorted(files.keys()):
-            print(f"  📄 {Path(file_path).name}")
+            print(f"  {Path(file_path).name}")
         
         # Test runtime content
         runtime_files = [f for f in files.keys() if 'runtime.ts' in f]
@@ -493,12 +493,12 @@ def test_config_driven_generation():
             if len(lines) > 15:
                 print(f"       ... ({len(lines)-15} more lines)")
         
-        print("\n✅ Config-driven generation test passed!")
+        print("\nConfig-driven generation test passed!")
         
     except ImportError:
-        print("❌ Could not import test app")
+        print("Could not import test app")
     except Exception as e:
-        print(f"❌ Test failed: {e}")
+        print(f"Test failed: {e}")
         import traceback
         traceback.print_exc()
 

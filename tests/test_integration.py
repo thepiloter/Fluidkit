@@ -173,9 +173,9 @@ def test_target_field_functionality():
         if runtime_files:
             runtime_content = files[runtime_files[0]]
             if "https://api.example.com" in runtime_content:
-                print("✅ Runtime correctly uses production URL")
+                print("Runtime correctly uses production URL")
             else:
-                print("❌ Runtime doesn't use production URL")
+                print("Runtime doesn't use production URL")
 
 
 def run_integration_tests():
