@@ -96,6 +96,46 @@ export const get_user = async (
 
 
 ---
+## Auto-Discovery
+
+FluidKit can automatically discover and bind APIRouters from files with the `+` prefix - inspired by SvelteKit's convention for special files. This enables **co-location** where your API logic sits next to your frontend routes, eliminating manual router imports and keeping related code together.
+
+**Create discoverable API files:**
+```python
+# routes/users/+api.py
+from fastapi import APIRouter
+from pydantic import BaseModel
+
+router = APIRouter()  # Any variable name works
+
+class User(BaseModel):
+    id: int
+    name: str
+
+@router.get("/users/{user_id}")
+async def get_user(user_id: int) -> User:
+    return User(id=user_id, name="John")
+```
+
+**Enable auto-discovery:**
+```json
+{
+  "autoDiscovery": {
+    "enabled": true,
+    "filePattern": "+*.py"
+  }
+}
+```
+
+**Benefits:**
+
+- ✅ **Zero boilerplate** - No manual router imports
+- ✅ **File co-location** - Place `+server.py` next to your frontend routes
+- ✅ **Flexible naming** - Any APIRouter variable name works
+- ✅ **Predictable routing** - Same behavior as manual `app.include_router()`
+
+
+---
 ##  Full-Stack Development
 Inspired by [Next.js server actions](https://nextjs.org/docs/14/app/building-your-application/data-fetching/server-actions-and-mutations) and [Svelte's remote functions proposal](https://github.com/sveltejs/kit/discussions/13897), FluidKit enables cross-language full-stack development without restrictions.
 
@@ -135,6 +175,7 @@ FluidKit behavior is controlled by `fluid.config.json`:
 
 ```json
 {
+  "framework": null,                 // "sveltekit" | "nextjs" for full-stack
   "target": "development",           // Which environment to build for
   "output": {
     "strategy": "mirror",            // File placement strategy
@@ -153,7 +194,20 @@ FluidKit behavior is controlled by `fluid.config.json`:
       "mode": "separate",
       "apiUrl": "https://api.example.com"
     }
-  }
+  },
+
+  "include": [                       // Auto-discovery scan paths
+    "src/**/*.py",
+    "lib/**/*.py"
+  ],
+  "exclude": [                       // Exclude patterns
+    "**/__pycache__/**",
+    "**/*.test.py"
+  ],
+  "autoDiscovery": {
+    "enabled": false,                // Enable +*.py auto-discovery
+    "filePattern": "+*.py"           // File pattern to scan
+  },
 }
 ```
 
@@ -166,6 +220,11 @@ FluidKit behavior is controlled by `fluid.config.json`:
 | `output.location` | `".fluidkit"` \| `"src/lib"` | Directory for runtime.ts and mirror structure |
 | `mode` | `"unified"` \| `"separate"` | Same codebase vs separate frontend/backend repos |
 | `framework` | `"sveltekit"` \| `"nextjs"` | Enable full-stack integration |
+| `include` | `["src/**/*.py"]` | Paths to scan for auto-discovery |
+| `exclude` | `["**/*.test.py"]` | Patterns to exclude from scanning |
+| `autoDiscovery.enabled` | `true` \| `false` | Enable `+*.py` auto-discovery |
+| `autoDiscovery.filePattern` | `"+*.py"` | File pattern for auto-discovery |
+
 
 **Mode Explanation:**
 - **`"unified"`**: Frontend and backend in same codebase (full-stack apps)

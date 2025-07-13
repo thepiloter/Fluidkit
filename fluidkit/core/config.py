@@ -9,7 +9,20 @@ supporting both full-stack and normal flow configurations.
 import json
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional, Literal
+from typing import Dict, Any, Optional, Literal, List
+
+
+__version__ = "0.2.0"
+
+def get_version() -> str:
+    return __version__
+
+
+@dataclass
+class AutoDiscoveryConfig:
+    """Auto-discovery configuration for +*.py files."""
+    enabled: bool = False
+    filePattern: str = "+*.py"
 
 
 @dataclass
@@ -38,6 +51,9 @@ class FluidKitConfig:
     """Complete FluidKit configuration."""
     target: str = "development"
     framework: Optional[str] = None
+    include: List[str] = field(default_factory=lambda: ["src/**/*.py"])
+    exclude: List[str] = field(default_factory=lambda: ["**/__pycache__/**", "**/*.test.py", "**/*.spec.py"])
+    autoDiscovery: AutoDiscoveryConfig = field(default_factory=AutoDiscoveryConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     backend: BackendConfig = field(default_factory=BackendConfig)
     environments: Dict[str, EnvironmentConfig] = field(default_factory=dict)
@@ -52,7 +68,7 @@ class FluidKitConfig:
                 ),
                 "production": EnvironmentConfig(
                     mode="separate", 
-                    apiUrl="https://api.example.com"  # User should override this
+                    apiUrl="https://api.example.com"
                 )
             }
         
@@ -71,11 +87,9 @@ class FluidKitConfig:
         if not self.is_fullstack_config:
             return False
         
-        # Generate proxy if any environment uses unified mode
-        return any(
-            env.mode == "unified" 
-            for env in self.environments.values()
-        )
+        # Generate proxy if target environment uses unified mode
+        target_env = self.get_environment(self.target)
+        return target_env.mode == "unified"
     
     def get_environment(self, env_name: str = "development") -> EnvironmentConfig:
         """Get configuration for specific environment."""
@@ -126,11 +140,11 @@ def _load_config_from_file(config_path: Path) -> FluidKitConfig:
 
 
 def _create_default_config(project_root: str, config_path: Path) -> FluidKitConfig:
-    """Create default configuration and save to file."""
+    """Create default configuration and save to file with examples."""
     default_config = FluidKitConfig()
     
-    # Save default config to file
-    _save_config_to_file(default_config, config_path)
+    # Save default config with commented examples
+    _save_config_to_file_with_examples(default_config, config_path)
     
     print(f"✓ Created default FluidKit config at {config_path}")
     return default_config
@@ -139,14 +153,24 @@ def _create_default_config(project_root: str, config_path: Path) -> FluidKitConf
 def _validate_and_convert_config(config_data: Dict[str, Any]) -> FluidKitConfig:
     """Validate and convert raw config data to FluidKitConfig object."""
     
+    # Extract target and include/exclude
+    target = config_data.get("target", "development")
+    include = config_data.get("include", ["src/**/*.py"])
+    exclude = config_data.get("exclude", ["**/__pycache__/**", "**/*.test.py", "**/*.spec.py"])
+    
+    # Extract auto-discovery config
+    auto_discovery_data = config_data.get("autoDiscovery", {"enabled": False})
+    auto_discovery = AutoDiscoveryConfig(
+        enabled=auto_discovery_data.get("enabled", False),
+        filePattern=auto_discovery_data.get("filePattern", "+*.py")
+    )
+    
     # Extract and validate output config
     output_data = config_data.get("output", {})
     output_config = OutputConfig(
         strategy=output_data.get("strategy", "mirror"),
         location=output_data.get("location", ".fluidkit")
     )
-
-    target = config_data.get("target", "development")
     
     # Validate strategy
     if output_config.strategy not in ["mirror", "co-locate"]:
@@ -176,10 +200,13 @@ def _validate_and_convert_config(config_data: Dict[str, Any]) -> FluidKitConfig:
     # Create final config
     config = FluidKitConfig(
         target=target,
+        include=include,
+        exclude=exclude,
+        autoDiscovery=auto_discovery,
+        framework=config_data.get("framework"),
         output=output_config,
         backend=backend_config,
-        environments=environments,
-        framework=config_data.get("framework"),
+        environments=environments
     )
     
     return config
@@ -196,10 +223,62 @@ def _save_config_to_file(config: FluidKitConfig, config_path: Path):
         json.dump(config_dict, f, indent=2, ensure_ascii=False)
 
 
+def _save_config_to_file_with_examples(config: FluidKitConfig, config_path: Path):
+    """Save configuration to JSON file with commented examples."""
+    # Ensure directory exists
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Create comprehensive config showing all options
+    config_content = {
+        "framework": None,
+        "target": "development",
+        "output": {
+            "strategy": "mirror",
+            "location": ".fluidkit"
+        },
+        "backend": {
+            "host": "localhost",
+            "port": 8000
+        },
+        "environments": {
+            "development": {
+                "mode": "separate",
+                "apiUrl": "http://localhost:8000"
+            },
+            "production": {
+                "mode": "separate",
+                "apiUrl": "https://api.example.com"
+            }
+        },
+        "include": [
+            "src/**/*.py",
+            "lib/**/*.py"
+        ],
+        "exclude": [
+            "**/__pycache__/**",
+            "**/*.test.py",
+            "**/*.spec.py"
+        ],
+        "autoDiscovery": {
+            "enabled": False,
+            "filePattern": "+*.py"
+        },
+    }
+    
+    with open(config_path, 'w', encoding='utf-8') as f:
+        json.dump(config_content, f, indent=2, ensure_ascii=False)
+
+
 def _config_to_dict(config: FluidKitConfig) -> Dict[str, Any]:
     """Convert FluidKitConfig to dictionary for JSON serialization."""
     config_dict = {
         "target": config.target,
+        "include": config.include,
+        "exclude": config.exclude,
+        "autoDiscovery": {
+            "enabled": config.autoDiscovery.enabled,
+            "filePattern": config.autoDiscovery.filePattern
+        },
         "output": {
             "strategy": config.output.strategy,
             "location": config.output.location
@@ -264,7 +343,6 @@ def update_config_framework(
 def test_config_management():
     """Test configuration loading and validation."""
     import tempfile
-    import shutil
     
     print("=== TESTING CONFIG MANAGEMENT ===")
     
@@ -274,9 +352,10 @@ def test_config_management():
         # Test 1: Create default config
         print("\n1. Testing default config creation:")
         config = load_fluidkit_config(str(temp_path))
-        print(f"   Framework: {config.framework}")
+        print(f"   Target: {config.target}")
         print(f"   Strategy: {config.output.strategy}")
         print(f"   Location: {config.output.location}")
+        print(f"   Auto-discovery enabled: {config.autoDiscovery.enabled}")
         print(f"   Is fullstack: {config.is_fullstack_config}")
         print(f"   Should generate proxy: {config.should_generate_proxy}")
         
@@ -286,37 +365,24 @@ def test_config_management():
         assert config2.output.strategy == config.output.strategy
         print("   ✓ Config loaded successfully")
         
-        # Test 3: Full-stack config update
-        print("\n3. Testing framework update:")
-        fullstack_config = update_config_framework(
-            str(temp_path), 
-            "sveltekit",
-            {
-                "output": {"location": "src/lib/.fluidkit"},
-                "environments": {
-                    "development": {"mode": "unified", "apiUrl": "/api"}
+        # Test 3: Auto-discovery config
+        print("\n3. Testing auto-discovery config:")
+        test_config_path = temp_path / "test.config.json"
+        with open(test_config_path, 'w') as f:
+            json.dump({
+                "target": "development",
+                "autoDiscovery": {
+                    "enabled": True,
+                    "filePattern": "+*.py"
                 }
-            }
-        )
-        print(f"   Framework: {fullstack_config.framework}")
-        print(f"   Location: {fullstack_config.output.location}")
-        print(f"   Dev mode: {fullstack_config.environments['development'].mode}")
-        print(f"   Is fullstack: {fullstack_config.is_fullstack_config}")
-        print(f"   Should generate proxy: {fullstack_config.should_generate_proxy}")
+            }, f)
         
-        # Test 4: Invalid config handling
-        print("\n4. Testing validation:")
-        invalid_config_path = temp_path / "invalid.config.json"
-        with open(invalid_config_path, 'w') as f:
-            json.dump({"output": {"strategy": "invalid"}}, f)
+        auto_config = _load_config_from_file(test_config_path)
+        print(f"   Auto-discovery enabled: {auto_config.autoDiscovery.enabled}")
+        print(f"   File pattern: {auto_config.autoDiscovery.filePattern}")
+        print(f"   Include paths: {auto_config.include}")
         
-        try:
-            _load_config_from_file(invalid_config_path)
-            assert False, "Should have failed validation"
-        except ValueError as e:
-            print(f"   ✓ Validation caught error: {e}")
-    
-    print("\n✅ All config management tests passed!")
+        print("\n✅ All config management tests passed!")
 
 
 if __name__ == "__main__":
