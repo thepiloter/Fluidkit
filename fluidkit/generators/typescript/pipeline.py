@@ -318,7 +318,7 @@ def _generate_sveltekit_proxy(env_config, project_root: str, config: FluidKitCon
     
     proxy_content = f'''import type {{ RequestHandler, RequestEvent }} from '@sveltejs/kit';
 
-const FASTAPI_URL = '{config.backend.scheme}://{config.backend.host}:{config.backend.port}';
+const FASTAPI_URL = 'http://{config.backend.host}:{config.backend.port}';
 
 // Only skip headers that would BREAK the request
 const SKIP_HEADERS = new Set<string>([
