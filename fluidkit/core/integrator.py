@@ -16,6 +16,7 @@ from fluidkit.introspection.routes import route_to_node
 from fluidkit.introspection.models import discover_models_from_routes
 from fluidkit.core.config import load_fluidkit_config, FluidKitConfig
 from fluidkit.core.schema import FluidKitApp, RouteNode, LanguageType
+from fluidkit.core.autodiscovery import auto_discover_and_bind_routes
 
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,7 @@ def integrate(
         'strategy': options.pop('strategy', None),
         'target': options.pop('target', None),
         'framework': options.pop('framework', None),
+        'auto_discovery': options.pop('auto_discovery', None),
     }
 
     # Apply config overrides
@@ -69,6 +71,8 @@ def integrate(
         config.target = config_overrides['target']
     if config_overrides['framework']:
         config.framework = config_overrides['framework']
+    if config_overrides['auto_discovery'] is not None:
+        config.autoDiscovery.enabled = config_overrides['auto_discovery']
     
     # Remaining options are runtime config
     runtime_config = options
@@ -80,8 +84,12 @@ def integrate(
         logger.debug(f"Output strategy: {config.output.strategy}")
         logger.debug(f"Output location: {config.output.location}")
         logger.debug(f"Target: {config.target}")
+        logger.debug(f"Auto-discovery enabled: {config.autoDiscovery.enabled}")
     
-    # Collect and convert routes
+    # Auto-discover and bind routes BEFORE collecting existing routes
+    discovery_results = auto_discover_and_bind_routes(app, config, project_root, verbose)
+    
+    # Collect and convert routes (now includes auto-discovered + manual routes)
     api_routes = _collect_fastapi_routes(app)
     route_nodes = _convert_routes_to_nodes(api_routes)
     
@@ -96,12 +104,15 @@ def integrate(
         metadata={
             'project_root': project_root,
             'config': config,
+            'discovery_results': discovery_results,
             **runtime_config
         }
     )
     
     if verbose:
         logger.info(f"Introspection complete: {len(route_nodes)} routes, {len(model_nodes)} models")
+        if discovery_results:
+            logger.info(f"Auto-discovery: {len(discovery_results)} routers discovered")
     
     # Generate client code
     target_lang = lang or "typescript"
@@ -148,8 +159,11 @@ def _write_generated_files(generated_files: Dict[str, str], verbose: bool):
             file_path_obj = Path(file_path)
             file_path_obj.parent.mkdir(parents=True, exist_ok=True)
             
-            header = _get_file_header(file_path_obj.suffix)
-            final_content = header + content
+            if file_path_obj.name == ".manifest.json":
+                final_content = content
+            else:
+                header = _get_file_header(file_path_obj.suffix)
+                final_content = header + content
             
             with open(file_path_obj, 'w', encoding='utf-8') as f:
                 f.write(final_content)
@@ -263,6 +277,9 @@ def introspect_only(app: FastAPI, project_root: Optional[str] = None, **options)
     # Load config for consistency
     config = load_fluidkit_config(project_root)
     
+    # Auto-discover routes if enabled
+    discovery_results = auto_discover_and_bind_routes(app, config, project_root, options.get('verbose', False))
+    
     api_routes = _collect_fastapi_routes(app)
     route_nodes = _convert_routes_to_nodes(api_routes)
     model_nodes = discover_models_from_routes(route_nodes, project_root)
@@ -271,7 +288,7 @@ def introspect_only(app: FastAPI, project_root: Optional[str] = None, **options)
         models=model_nodes,
         routes=route_nodes,
         app_instance=app,
-        metadata={'project_root': project_root, 'config': config, **options}
+        metadata={'project_root': project_root, 'config': config, 'discovery_results': discovery_results, **options}
     )
     
     flow_type = "full-stack" if config.is_fullstack_config else "normal"
@@ -293,6 +310,9 @@ def generate_only(
     # Load config for generation settings
     config = load_fluidkit_config(project_root)
     
+    # Auto-discover routes if enabled
+    discovery_results = auto_discover_and_bind_routes(app, config, project_root, options.get('verbose', False))
+    
     api_routes = _collect_fastapi_routes(app)
     route_nodes = _convert_routes_to_nodes(api_routes)
     model_nodes = discover_models_from_routes(route_nodes, project_root)
@@ -301,7 +321,7 @@ def generate_only(
         models=model_nodes,
         routes=route_nodes,
         app_instance=app,
-        metadata={'project_root': project_root, 'config': config, **options}
+        metadata={'project_root': project_root, 'config': config, 'discovery_results': discovery_results, **options}
     )
     
     generated_files = generate_typescript_files(
@@ -328,19 +348,13 @@ def test_integration():
         print("\n1. Normal flow integration:")
         fluid_app, files = integrate(app)
         
-        # Test 2: Custom project root
-        print("\n2. Custom project root:")
-        import tempfile
-        with tempfile.TemporaryDirectory() as temp_dir:
-            fluid_app, files = integrate(app, project_root=temp_dir)
+        # Test 2: Auto-discovery enabled
+        print("\n2. Auto-discovery integration:")
+        fluid_app, files = integrate(app, auto_discovery=True, verbose=True)
         
         # Test 3: Introspection only
         print("\n3. Introspection only:")
         fluid_app = introspect_only(app)
-        
-        # Test 4: Generate only (don't write)
-        print("\n4. Generate only (no file writing):")
-        files = generate_only(app)
         
         print("\n✅ All integration tests passed!")
         

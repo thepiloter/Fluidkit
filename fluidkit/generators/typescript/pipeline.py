@@ -7,9 +7,12 @@ Orchestrates import generation, interface generation, and fetch wrapper generati
 into complete TypeScript files with proper import statements.
 """
 
+import json
 from pathlib import Path
-from typing import Dict, List, Union
+from datetime import datetime
+from typing import Dict, List, Union, Optional
 
+from fluidkit.core.config import get_version
 from fluidkit.core.config import FluidKitConfig
 from fluidkit.core.schema import FluidKitApp, RouteNode, ModelNode
 from fluidkit.core.constants import FluidKitRuntime, GenerationPaths
@@ -41,6 +44,9 @@ def generate_typescript_files(
 
     project_root = fluid_app.metadata.get('project_root', str(Path.cwd().resolve()))
     
+    # Load previous manifest and cleanup stale files
+    previous_manifest = _load_previous_manifest(config, project_root)
+    
     # Group nodes by their generated file locations
     files_to_generate = _group_nodes_by_generated_files(fluid_app, config, project_root)
     
@@ -67,6 +73,26 @@ def generate_typescript_files(
     if config.should_generate_proxy:
         proxy_files = _generate_proxy_files(config, project_root)
         generated_files.update(proxy_files)
+
+    # Create new manifest
+    manifest = _create_generation_manifest(fluid_app, generated_files, config, project_root)
+    manifest_path = str(Path(project_root) / config.output.location / ".manifest.json")
+    generated_files[manifest_path] = json.dumps(manifest, indent=2)
+    
+    # Cleanup stale files after we know what we're generating
+    if previous_manifest:
+        current_files = set(generated_files.keys())
+        previous_files = set(previous_manifest.get("generatedFiles", []))
+        stale_files = previous_files - current_files
+        
+        for stale_file in stale_files:
+            if not stale_file.endswith(".manifest.json"):
+                path_obj = Path(stale_file)
+                if path_obj.exists():
+                    try:
+                        path_obj.unlink()
+                    except Exception:
+                        pass
     
     return generated_files
 
@@ -479,6 +505,71 @@ export async function PATCH(request: NextRequest, {{ params }}: {{ params: {{ pa
 }}'''
 
     return {str(proxy_route_path): proxy_content}
+
+
+def _load_previous_manifest(config: FluidKitConfig, project_root: str) -> Optional[Dict]:
+    """Load previous generation manifest."""
+    manifest_path = Path(project_root) / config.output.location / ".manifest.json"
+    
+    if manifest_path.exists():
+        try:
+            with open(manifest_path, 'r') as f:
+                return json.load(f)
+        except Exception:
+            return None
+    return None
+
+
+def _cleanup_stale_files(previous_manifest: Dict):
+    """Remove files that were generated previously but not in current generation."""
+    for file_path in previous_manifest.get("generatedFiles", []):
+        if file_path.endswith(".manifest.json"):
+            continue  # Don't delete manifest itself
+        
+        path_obj = Path(file_path)
+        if path_obj.exists():
+            try:
+                path_obj.unlink()
+            except Exception:
+                pass  # Silent cleanup
+
+
+def _create_generation_manifest(
+    fluid_app: FluidKitApp, 
+    generated_files: Dict[str, str], 
+    config: FluidKitConfig, 
+    project_root: str
+) -> Dict:
+    """Create manifest tracking all generated files."""
+    from datetime import datetime
+    
+    # Get auto-discovered files
+    discovery_results = fluid_app.metadata.get('discovery_results', [])
+    auto_discovered = [r['file'] for r in discovery_results]
+    
+    # Map source files to generated files
+    source_to_generated = {}
+    
+    for model in fluid_app.models:
+        if model.location.file_path:
+            ts_file = _get_generated_file_path(model.location, config, project_root)
+            source_to_generated[model.location.file_path] = [ts_file]
+    
+    for route in fluid_app.routes:
+        if route.location.file_path:
+            ts_file = _get_generated_file_path(route.location, config, project_root)
+            if route.location.file_path not in source_to_generated:
+                source_to_generated[route.location.file_path] = []
+            if ts_file not in source_to_generated[route.location.file_path]:
+                source_to_generated[route.location.file_path].append(ts_file)
+    
+    return {
+        "version": get_version(),
+        "lastGenerated": datetime.now().isoformat(),
+        "sourceToGenerated": source_to_generated,
+        "generatedFiles": list(generated_files.keys()),
+        "autoDiscoveredFiles": auto_discovered
+    }
 
 
 # === TESTING HELPERS === #
