@@ -332,10 +332,10 @@ def test_imports():
         
         try:
             result = _calculate_relative_import_path(source_ts, target_ts)
-            print(f"✓ {source_py} → {target_py}: {result}")
+            print(f"{source_py} → {target_py}: {result}")
             # Note: In real testing, you'd assert result == expected
         except Exception as e:
-            print(f"✗ {source_py} → {target_py}: FAILED - {e}")
+            print(f"{source_py} → {target_py}: FAILED - {e}")
     
     print("\nimport tests completed!")
 

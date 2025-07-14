@@ -1,7 +1,7 @@
-from fastapi import FastAPI
+from typing import Annotated
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import users, orders
 
 # Create FastAPI app with comprehensive configuration
 app = FastAPI(
@@ -22,11 +22,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(users.router)
-app.include_router(orders.router)
-
-
 @app.get("/")
 async def root():
     """Root endpoint with basic info"""
@@ -43,8 +38,13 @@ async def root():
     }
 
 
+def get_sys():
+    return {"version": "1.0.0", "timestamp": "2024-01-01T00:00:00Z"}
+
+GetSys = Annotated[dict, Depends(get_sys)]
+
 @app.get("/health")
-async def health_check():
+async def health_check(get_sys: GetSys):
     """Health check endpoint"""
     return {"status": "healthy", "timestamp": "2024-01-01T00:00:00Z"}
 
