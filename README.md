@@ -96,8 +96,6 @@ export const get_user = async (
 
 
 ---
-Here's the updated Auto-Discovery section:
-
 ## Auto-Discovery
 
 FluidKit can automatically discover and bind APIRouters from files matching configurable patterns. This enables **co-location** where your API logic sits next to your frontend routes, eliminating manual router imports and keeping related code together.
