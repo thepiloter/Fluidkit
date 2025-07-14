@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, Literal, List
 
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 def get_version() -> str:
     return __version__
@@ -20,9 +20,9 @@ def get_version() -> str:
 
 @dataclass
 class AutoDiscoveryConfig:
-    """Auto-discovery configuration for +*.py files."""
+    """Auto-discovery configuration for multiple file patterns."""
     enabled: bool = False
-    filePattern: str = "+*.py"
+    filePatterns: List[str] = field(default_factory=lambda: ["_*.py", "*.*.py"])
 
 
 @dataclass
@@ -130,7 +130,7 @@ def _load_config_from_file(config_path: Path) -> FluidKitConfig:
         # Validate and convert to config object
         validated_config = _validate_and_convert_config(config_data)
         
-        print(f"✓ Loaded FluidKit config from {config_path}")
+        print(f"Loaded FluidKit config from {config_path}")
         return validated_config
         
     except json.JSONDecodeError as e:
@@ -146,7 +146,7 @@ def _create_default_config(project_root: str, config_path: Path) -> FluidKitConf
     # Save default config with commented examples
     _save_config_to_file_with_examples(default_config, config_path)
     
-    print(f"✓ Created default FluidKit config at {config_path}")
+    print(f"Created default FluidKit config at {config_path}")
     return default_config
 
 
@@ -162,7 +162,7 @@ def _validate_and_convert_config(config_data: Dict[str, Any]) -> FluidKitConfig:
     auto_discovery_data = config_data.get("autoDiscovery", {"enabled": False})
     auto_discovery = AutoDiscoveryConfig(
         enabled=auto_discovery_data.get("enabled", False),
-        filePattern=auto_discovery_data.get("filePattern", "+*.py")
+        filePatterns=auto_discovery_data.get("filePatterns", ["_*.py", "*.*.py"])
     )
     
     # Extract and validate output config
@@ -202,11 +202,11 @@ def _validate_and_convert_config(config_data: Dict[str, Any]) -> FluidKitConfig:
         target=target,
         include=include,
         exclude=exclude,
-        autoDiscovery=auto_discovery,
-        framework=config_data.get("framework"),
         output=output_config,
         backend=backend_config,
-        environments=environments
+        environments=environments,
+        autoDiscovery=auto_discovery,
+        framework=config_data.get("framework"),
     )
     
     return config
@@ -261,7 +261,7 @@ def _save_config_to_file_with_examples(config: FluidKitConfig, config_path: Path
         ],
         "autoDiscovery": {
             "enabled": False,
-            "filePattern": "+*.py"
+            "filePatterns": ["_*.py", "*.*.py"]
         },
     }
     
@@ -277,7 +277,7 @@ def _config_to_dict(config: FluidKitConfig) -> Dict[str, Any]:
         "exclude": config.exclude,
         "autoDiscovery": {
             "enabled": config.autoDiscovery.enabled,
-            "filePattern": config.autoDiscovery.filePattern
+            "filePatterns": config.autoDiscovery.filePatterns
         },
         "output": {
             "strategy": config.output.strategy,
@@ -363,7 +363,7 @@ def test_config_management():
         print("\n2. Testing config loading:")
         config2 = load_fluidkit_config(str(temp_path))
         assert config2.output.strategy == config.output.strategy
-        print("   ✓ Config loaded successfully")
+        print("   Config loaded successfully")
         
         # Test 3: Auto-discovery config
         print("\n3. Testing auto-discovery config:")
@@ -373,7 +373,7 @@ def test_config_management():
                 "target": "development",
                 "autoDiscovery": {
                     "enabled": True,
-                    "filePattern": "+*.py"
+                    "filePatterns": ["_*.py", "*.*.py"]
                 }
             }, f)
         

@@ -96,23 +96,25 @@ export const get_user = async (
 
 
 ---
+Here's the updated Auto-Discovery section:
+
 ## Auto-Discovery
 
-FluidKit can automatically discover and bind APIRouters from files with the `+` prefix - inspired by SvelteKit's convention for special files. This enables **co-location** where your API logic sits next to your frontend routes, eliminating manual router imports and keeping related code together.
+FluidKit can automatically discover and bind APIRouters from files matching configurable patterns. This enables **co-location** where your API logic sits next to your frontend routes, eliminating manual router imports and keeping related code together.
 
 **Create discoverable API files:**
 ```python
-# routes/users/+api.py
+# routes/users/_api.py  OR  routes/users/users.api.py
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-router = APIRouter()  # Any variable name works
+router = APIRouter(prefix="/users")
 
 class User(BaseModel):
     id: int
     name: str
 
-@router.get("/users/{user_id}")
+@router.get("/{user_id}")
 async def get_user(user_id: int) -> User:
     return User(id=user_id, name="John")
 ```
@@ -122,17 +124,22 @@ async def get_user(user_id: int) -> User:
 {
   "autoDiscovery": {
     "enabled": true,
-    "filePattern": "+*.py"
+    "filePatterns": ["_*.py", "*.*.py"]
   }
 }
 ```
 
-**Benefits:**
+**Supported patterns:**
+- `_api.py`, `_routes.py` (underscore prefix `_*.py`)
+- `data.client.py`, `admin.routes.py` (any dot pattern `*.*.py`)
 
+**Benefits:**
 - ✅ **Zero boilerplate** - No manual router imports
-- ✅ **File co-location** - Place `+server.py` next to your frontend routes
+- ✅ **File co-location** - Place API files next to your frontend routes
 - ✅ **Flexible naming** - Any APIRouter variable name works
 - ✅ **Predictable routing** - Same behavior as manual `app.include_router()`
+
+> **Note:** Auto-discovered files should use **absolute imports** (e.g., `from models.user import User`) rather than relative imports (e.g., `from .models.user import User`) for reliable operation across all project structures.
 
 
 ---

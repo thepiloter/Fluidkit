@@ -5,11 +5,11 @@ from uuid import UUID
 from fastapi import APIRouter, Query, Path, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 
-from .models.orders import (
+from tests.sample.models.orders import (
     Order, OrderResponse, OrderListResponse, OrderSummary, 
     CreateOrderRequest, UpdateOrderRequest, OrderStatus, ShippingMethod
 )
-from .models.users import User
+from tests.sample.models.users import User
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 security = HTTPBearer()
