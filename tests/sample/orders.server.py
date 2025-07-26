@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query, Path, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 
-from tests.sample.models.orders import (
+from .models.orders import (
     Order, OrderResponse, OrderListResponse, OrderSummary, 
     CreateOrderRequest, UpdateOrderRequest, OrderStatus, ShippingMethod
 )
@@ -38,18 +38,6 @@ async def list_orders(
         has_next=False,
         has_prev=False
     )
-
-
-@router.get("/{order_id}", response_model=OrderResponse)
-async def get_order(
-    order_id: UUID = Path(..., description="Order ID"),
-    include_customer_details: bool = Query(True, description="Include full customer details"),
-    include_payment_details: bool = Query(False, description="Include payment details"),
-    token: str = Depends(security)
-) -> OrderResponse:
-    """Get order by ID with optional detail levels"""
-    # Mock implementation
-    raise HTTPException(status_code=404, detail="Order not found")
 
 
 @router.post("/", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
