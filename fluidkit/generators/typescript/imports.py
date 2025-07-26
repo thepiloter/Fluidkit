@@ -28,6 +28,7 @@ def generate_imports_for_file(
     context: ImportContext,
     fluid_app: FluidKitApp,
     needs_runtime: bool = False,
+    runtime_types_used: List[str] = None,
     **runtime_config
 ) -> str:
     """
@@ -38,13 +39,11 @@ def generate_imports_for_file(
         context: Import generation context with config
         fluid_app: Complete app model for type resolution
         needs_runtime: Whether to include FluidKit runtime imports
+        runtime_types_used: Exact list of runtime types/functions used
         **runtime_config: Runtime function names (api_result_type, etc.)
         
     Returns:
         Complete import statements as string (empty if no imports needed)
-
-    Raises:
-        ValueError: If path calculation fails
     """
     all_import_statements = []
     
@@ -61,8 +60,12 @@ def generate_imports_for_file(
             type_locations[type_name] = model.location
     
     # Generate runtime import statement if needed
-    if needs_runtime:
-        runtime_import = _generate_runtime_import_statement(context, **runtime_config)
+    if needs_runtime and runtime_types_used:
+        runtime_import = _generate_runtime_import_statement(
+            context, 
+            runtime_types_used=runtime_types_used,
+            **runtime_config
+        )
         if runtime_import:
             all_import_statements.append(runtime_import)
     
@@ -107,19 +110,38 @@ def _generate_type_import_statements(
 
 def _generate_runtime_import_statement(
     context: ImportContext,
+    runtime_types_used: List[str],
     api_result_type: str = "ApiResult",
     get_base_url_fn: str = "getBaseUrl", 
     handle_response_fn: str = "handleResponse"
 ) -> Optional[str]:
-    """Generate FluidKit runtime import statement using config."""
+    """Generate FluidKit runtime import statement with exact types used."""
+    if not runtime_types_used:
+        return None
+    
     runtime_path = _get_runtime_import_path(context)
     
-    # Separate type imports from function imports
-    type_import = f"import type {{ {api_result_type} }} from '{runtime_path}';"
-    function_imports = [get_base_url_fn, handle_response_fn]
-    function_import = f"import {{ {', '.join(function_imports)} }} from '{runtime_path}';"
+    # Separate types from functions
+    known_types = {
+        api_result_type, "SSECallbacks", "SSEConnection", "SSERequestInit",
+        "StreamingCallbacks", "TextStreamCallbacks"
+    }
+    known_functions = {get_base_url_fn, handle_response_fn}
     
-    return f"{type_import}\n{function_import}"
+    type_imports = [item for item in runtime_types_used if item in known_types]
+    function_imports = [item for item in runtime_types_used if item in known_functions]
+    
+    import_statements = []
+    
+    if type_imports:
+        type_import = f"import type {{ {', '.join(sorted(type_imports))} }} from '{runtime_path}';"
+        import_statements.append(type_import)
+    
+    if function_imports:
+        function_import = f"import {{ {', '.join(sorted(function_imports))} }} from '{runtime_path}';"
+        import_statements.append(function_import)
+    
+    return '\n'.join(import_statements) if import_statements else None
 
 
 def _calculate_import_path(

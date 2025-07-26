@@ -1,4 +1,4 @@
-import sys
+import sys, ast
 import importlib.util
 import importlib.metadata
 from pathlib import Path
@@ -22,6 +22,65 @@ class ModuleInfo:
     package_name: Optional[str] = None
     version: Optional[str] = None
     error: Optional[str] = None
+
+
+class FunctionReturnDetector(ast.NodeVisitor):
+    """
+    Scope-aware AST visitor that finds return statements belonging to a specific function.
+    
+    Handles nested functions properly by tracking function scope entry/exit.
+    """
+    
+    def __init__(self, target_function_name: str):
+        self.target_function_name = target_function_name
+        self.returns = []
+        self.in_target_function = False
+    
+    def visit_FunctionDef(self, node):
+        self._visit_function(node)
+    
+    def visit_AsyncFunctionDef(self, node):
+        self._visit_function(node)
+    
+    def _visit_function(self, node):
+        if node.name == self.target_function_name:
+            # Entering target function scope
+            old_state = self.in_target_function
+            self.in_target_function = True
+            self.generic_visit(node)  # Visit children
+            self.in_target_function = old_state
+        else:
+            # Different function - don't enter its scope
+            pass
+    
+    def visit_Return(self, node):
+        if self.in_target_function:
+            self.returns.append(node)
+
+
+def find_function_returns(func) -> list:
+    """
+    Find all return statements that belong to a specific function using scope-aware AST analysis.
+    
+    Args:
+        func: Function to analyze
+        
+    Returns:
+        List of ast.Return nodes that belong to the function
+    """
+    import inspect
+    
+    try:
+        source = inspect.getsource(func)
+        tree = ast.parse(source)
+        
+        detector = FunctionReturnDetector(func.__name__)
+        detector.visit(tree)
+        
+        return detector.returns
+    except Exception:
+        return []
+
 
 def classify_module(module_name: str, project_root: Optional[str] = None) -> ModuleType:
     """

@@ -10,7 +10,7 @@ import typing
 import inspect
 from enum import Enum
 from functools import lru_cache
-from typing import Any, Union, get_origin, get_args
+from typing import Any, Union, Optional, get_origin, get_args
 
 from fluidkit.core.schema import FieldAnnotation, BaseType, ContainerType
 
@@ -211,6 +211,12 @@ def _convert_custom_type(py_type: type) -> FieldAnnotation:
     
     Handles module prefixes and extracts clean class names.
     """
+    # Check for common external types first
+    common_external = _check_common_external_type(py_type)
+    if common_external:
+        return common_external
+    
+    # Custom type logic for project types
     class_name = py_type.__name__
     
     # Clean up module prefixes like "__main__.User" -> "User"
@@ -233,6 +239,85 @@ def _is_primitive_type(py_type: Any) -> bool:
     """Check if type is a Python primitive type."""
     primitive_types = {int, float, str, bool, dict, list, tuple, set}
     return py_type in primitive_types
+
+
+def _check_common_external_type(py_type: type) -> Optional[FieldAnnotation]:
+    """
+    Check for common external types using simple instance checking.
+    
+    Returns FieldAnnotation with is_common_external=True if found.
+    """
+    # Python built-ins (always available)
+    import uuid
+    from decimal import Decimal
+    from datetime import datetime, date
+    from pathlib import Path
+    
+    if py_type is uuid.UUID:
+        return FieldAnnotation(
+            custom_type="UUID",
+            is_common_external=True,
+            class_reference=py_type
+        )
+    
+    if py_type is Decimal:
+        return FieldAnnotation(
+            custom_type="Decimal", 
+            is_common_external=True,
+            class_reference=py_type
+        )
+    
+    if py_type is datetime:
+        return FieldAnnotation(
+            custom_type="datetime",
+            is_common_external=True,
+            class_reference=py_type
+        )
+    
+    if py_type is date:
+        return FieldAnnotation(
+            custom_type="date",
+            is_common_external=True,
+            class_reference=py_type
+        )
+    
+    if py_type is Path:
+        return FieldAnnotation(
+            custom_type="Path",
+            is_common_external=True,
+            class_reference=py_type
+        )
+    
+    # Common third-party (with try/catch)
+    try:
+        from pydantic import EmailStr, HttpUrl
+        if py_type is EmailStr:
+            return FieldAnnotation(
+                custom_type="EmailStr",
+                is_common_external=True,
+                class_reference=py_type
+            )
+        if py_type is HttpUrl:
+            return FieldAnnotation(
+                custom_type="HttpUrl", 
+                is_common_external=True,
+                class_reference=py_type
+            )
+    except ImportError:
+        pass
+    
+    try:
+        from pydantic_extra_types.payment import PaymentCardNumber
+        if py_type is PaymentCardNumber:
+            return FieldAnnotation(
+                custom_type="PaymentCardNumber",
+                is_common_external=True,
+                class_reference=py_type
+            )
+    except ImportError:
+        pass
+    
+    return None
 
 
 # === TESTING HELPERS === #
