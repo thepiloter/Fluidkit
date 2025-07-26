@@ -117,6 +117,23 @@ async def get_user(user_id: int) -> User:
     return User(id=user_id, name="John")
 ```
 
+**SvelteKit-style folder structuring for fullstack development**
+```python
+# routes/users/[id]/profile.api.py - Dynamic parameters
+from fastapi import APIRouter
+
+router = APIRouter()
+
+@router.get("/details")
+async def get_profile(id: int):  # ✅ 'id' parameter required
+    return {"user_id": id, "profile": "details"}
+
+# routes/files/[...path]/handler.api.py - Rest parameters  
+@router.get("/download")
+async def download_file(path: str):  # ✅ 'path' parameter required
+    return {"file_path": path}
+```
+
 **Enable auto-discovery:**
 ```json
 {
@@ -127,18 +144,32 @@ async def get_user(user_id: int) -> User:
 }
 ```
 
+**Folder Structure → FastAPI Route Translation:**
+
+| Folder Structure | Generated Route | Required Parameters |
+|------------------|-----------------|-------------------|
+| `routes/users/_api.py` | `/users/*` | None |
+| `routes/users/[id]/profile.api.py` | `/users/{id}/*` | `id` |
+| `routes/files/[...path]/handler.api.py` | `/files/{path:path}/*` | `path` |
+| `routes/(admin)/users/manage.api.py` | `/users/*` | None (groups ignored) |
+
 **Supported patterns:**
-- `_api.py`, `_routes.py` (underscore prefix `_*.py`)
-- `data.client.py`, `admin.routes.py` (any dot pattern `*.*.py`)
+1. Auto discovered files:
+  - `_api.py`, `_routes.py` (underscore prefix `_*.py`)
+  - `user.api.py`, `admin.service.py` (any dot pattern `*.*.py`)
+2. Valid folder naming patterns:
+  - `[id]`, `[userId]` (dynamic parameters)
+  - `[...path]`, `[...file]` (rest parameters)
+  - `(admin)`, `(app)` (route groups - organize without affecting URLs)
 
 **Benefits:**
 - ✅ **Zero boilerplate** - No manual router imports
 - ✅ **File co-location** - Place API files next to your frontend routes
-- ✅ **Flexible naming** - Any APIRouter variable name works
+- ✅ **Parameter validation** - FluidKit ensures path parameters match function signatures
+- ✅ **Framework-style routing** - SvelteKit/Next.js conventions for Python
 - ✅ **Predictable routing** - Same behavior as manual `app.include_router()`
 
-> **Note:** Auto-discovered files should use **absolute imports** (e.g., `from models.user import User`) rather than relative imports (e.g., `from .models.user import User`) for reliable operation across all project structures.
-
+> **Note:** FluidKit validates that functions in parameterized folders (e.g., `[id]`) include the required parameters in their signatures. Missing parameters will raise clear validation errors during startup.
 
 ---
 ##  Full-Stack Development

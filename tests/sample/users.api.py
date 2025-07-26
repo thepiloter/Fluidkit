@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query, Path, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 
-from tests.sample.models.users import (
+from .models.users import (
     User, UserResponse, UserListResponse, CreateUserRequest, 
     UpdateUserRequest, UserRole, UserStatus
 )
