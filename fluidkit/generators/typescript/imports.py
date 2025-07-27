@@ -51,19 +51,26 @@ def generate_imports_for_file(
     all_referenced_types: Set[str] = set()
     for node in nodes:
         all_referenced_types.update(node.get_referenced_types())
+
+    needs_fluidtypes_namespace = _needs_fluidtypes_namespace(all_referenced_types)
     
-    # Resolve type locations (project types only)
     type_locations = {}
     for type_name in all_referenced_types:
-        model = fluid_app.find_model_by_name(type_name)
-        if model:  # Only project types will be found
-            type_locations[type_name] = model.location
+        if not type_name.startswith("FluidTypes."):
+            model = fluid_app.find_model_by_name(type_name)
+            if model:
+                type_locations[type_name] = model.location
+    
+    all_runtime_types = set()
+    if runtime_types_used:
+        all_runtime_types.update(runtime_types_used)
     
     # Generate runtime import statement if needed
-    if needs_runtime and runtime_types_used:
+    if needs_runtime or all_runtime_types or needs_fluidtypes_namespace:
         runtime_import = _generate_runtime_import_statement(
             context, 
-            runtime_types_used=runtime_types_used,
+            runtime_types_used=list(all_runtime_types),
+            needs_fluidtypes_namespace=needs_fluidtypes_namespace,
             **runtime_config
         )
         if runtime_import:
@@ -77,6 +84,10 @@ def generate_imports_for_file(
         return '\n'.join(all_import_statements)
     else:
         return ''
+
+
+def _needs_fluidtypes_namespace(referenced_types: Set[str]) -> bool:
+    return any(type_name.startswith("FluidTypes.") for type_name in referenced_types)
 
 
 def _generate_type_import_statements(
@@ -111,34 +122,41 @@ def _generate_type_import_statements(
 def _generate_runtime_import_statement(
     context: ImportContext,
     runtime_types_used: List[str],
+    needs_fluidtypes_namespace: bool = False,
     api_result_type: str = "ApiResult",
     get_base_url_fn: str = "getBaseUrl", 
     handle_response_fn: str = "handleResponse"
 ) -> Optional[str]:
     """Generate FluidKit runtime import statement with exact types used."""
-    if not runtime_types_used:
+    if not runtime_types_used and not needs_fluidtypes_namespace:
         return None
     
     runtime_path = _get_runtime_import_path(context)
-    
+
     # Separate types from functions
-    known_types = {
+    api_types = {
         api_result_type, "SSECallbacks", "SSEConnection", "SSERequestInit",
         "StreamingCallbacks", "TextStreamCallbacks"
     }
     known_functions = {get_base_url_fn, handle_response_fn}
     
-    type_imports = [item for item in runtime_types_used if item in known_types]
-    function_imports = [item for item in runtime_types_used if item in known_functions]
+    api_types_to_import = [t for t in runtime_types_used if t in api_types]
+    functions_to_import = [t for t in runtime_types_used if t in known_functions]
     
+    imports_needed = []
     import_statements = []
+
+    if needs_fluidtypes_namespace:
+        imports_needed.append("FluidTypes")
+    if api_types_to_import:
+        imports_needed.extend(api_types_to_import)
     
-    if type_imports:
-        type_import = f"import type {{ {', '.join(sorted(type_imports))} }} from '{runtime_path}';"
+    if imports_needed:
+        type_import = f"import type {{ {', '.join(sorted(set(imports_needed)))} }} from '{runtime_path}';"
         import_statements.append(type_import)
     
-    if function_imports:
-        function_import = f"import {{ {', '.join(sorted(function_imports))} }} from '{runtime_path}';"
+    if functions_to_import:
+        function_import = f"import {{ {', '.join(sorted(functions_to_import))} }} from '{runtime_path}';"
         import_statements.append(function_import)
     
     return '\n'.join(import_statements) if import_statements else None
@@ -331,6 +349,18 @@ def _get_runtime_file_path(config: FluidKitConfig, project_root: str) -> Path:
     """
     runtime_dir = Path(project_root).resolve() / config.output.location
     return runtime_dir / "runtime.ts"
+
+
+def _extract_runtime_types_from_annotation(annotation: FieldAnnotation) -> Set[str]:
+    runtime_types = set()
+    
+    if annotation.is_common_external and annotation.custom_type:
+        runtime_types.add(annotation.custom_type)
+    
+    for arg in annotation.args:
+        runtime_types.update(_extract_runtime_types_from_annotation(arg))
+    
+    return runtime_types
 
 
 # === TESTING HELPERS === #

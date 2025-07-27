@@ -7,13 +7,11 @@ into complete TypeScript files with proper import statements.
 
 import json
 from pathlib import Path
-from datetime import datetime
 from typing import Dict, List, Union, Optional
 
 from fluidkit.core.config import get_version
 from fluidkit.core.config import FluidKitConfig
 from fluidkit.core.schema import FluidKitApp, RouteNode, ModelNode
-from fluidkit.core.constants import FluidKitRuntime, GenerationPaths
 from fluidkit.generators.typescript.interfaces import generate_interface
 from fluidkit.generators.typescript.clients import generate_client_wrapper
 from fluidkit.generators.typescript.imports import ImportContext, generate_imports_for_file
@@ -149,18 +147,16 @@ def _generate_file_content(
                 client_sections.append(client_content)
                 all_used_runtime_types.update(used_types)
         
-        # Generate imports with exact runtime types used
-        if needs_runtime and all_used_runtime_types:
-            imports = generate_imports_for_file(
-                nodes=all_nodes,
-                context=context,
-                fluid_app=fluid_app,
-                needs_runtime=True,
-                runtime_types_used=list(all_used_runtime_types),
-                **runtime_config
-            )
-            if imports:
-                sections.append(imports)
+        imports = generate_imports_for_file(
+            nodes=all_nodes,
+            context=context,
+            fluid_app=fluid_app,
+            needs_runtime=needs_runtime,
+            runtime_types_used=list(all_used_runtime_types),
+            **runtime_config
+        )
+        if imports:
+            sections.append(imports)
         
         if client_sections:
             sections.append("\n\n".join(client_sections))
@@ -242,6 +238,8 @@ def _generate_base_runtime(config: FluidKitConfig) -> str:
         base_url_fn = _generate_framework_aware_base_url(config)
     else:
         base_url_fn = _generate_normal_flow_base_url(config)
+
+    common_types_exports = _generate_common_types_exports()
     
     return f'''/**
  * FluidKit Runtime Utilities
@@ -254,6 +252,8 @@ export interface ApiResult<T = any> {{
   status: number;
   success: boolean;
 }}
+
+{common_types_exports}
 
 {base_url_fn}
 
@@ -283,6 +283,62 @@ export async function handleResponse<T = any>(response: Response): Promise<ApiRe
     }};
   }}
 }}
+
+'''
+
+
+def _generate_common_types_exports() -> str:
+    return '''// === COMMON EXTERNAL TYPES === //
+
+export namespace FluidTypes {
+  /**
+   * UUID string type
+   * @external Python uuid.UUID -> string
+   */
+  export type UUID = string;
+
+  /**
+   * Decimal number type  
+   * @external Python decimal.Decimal -> number
+   */
+  export type Decimal = number;
+
+  /**
+   * DateTime string type (ISO format)
+   * @external Python datetime.datetime -> string
+   */
+  export type DateTime = string;
+
+  /**
+   * Date string type (ISO format)
+   * @external Python datetime.date -> string  
+   */
+  export type Date = string;
+
+  /**
+   * File path string type
+   * @external Python pathlib.Path -> string
+   */
+  export type Path = string;
+
+  /**
+   * Email string type
+   * @external Pydantic EmailStr -> string
+   */
+  export type EmailStr = string;
+
+  /**
+   * HTTP URL string type
+   * @external Pydantic HttpUrl -> string
+   */
+  export type HttpUrl = string;
+
+  /**
+   * Payment card number string type
+   * @external pydantic_extra_types.PaymentCardNumber -> string
+   */
+  export type PaymentCardNumber = string;
+}
 
 '''
 

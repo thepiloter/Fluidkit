@@ -4,380 +4,182 @@
   <img src="https://azure-deliberate-dog-514.mypinata.cloud/ipfs/bafkreiay74jzankyzj2zh4zemmpidafbsrcr4hwjxnl5e3qk32xyi6t3hi" alt="FluidKit Logo" width="125">
 </div>
 
-**Automatic TypeScript client generation for FastAPI through runtime introspection. Get tRPC-like developer experience with full-stack type safety across Python and TypeScript.** 
+**Web development for the pythoniers**
+
+FluidKit provides tooling for building modern, highly optimized fullstack web applications with Python + the power of SvelteKit. Automatic type-safe client generation and environment-aware proxying make FastAPI + SvelteKit feel like a unified framework.
 
 ```bash
 pip install fluidkit
 ```
 
+## Build Modern Web Apps with Python
+
+Access the JavaScript ecosystem for UI while keeping all your business logic in Python. No Node.js backend knowledge required.
+
+### 📦 **Client Generation** - For any project setup
 ```python
-# Add to your existing FastAPI app
 import fluidkit
-fluidkit.integrate(app)
+fluidkit.integrate(app)  # Generates portable TypeScript clients
 ```
 
-**That's it.** FluidKit automatically generates TypeScript clients with complete type safety.
-
-
----
-## Core Concept
-
-FluidKit **introspects your FastAPI application at runtime** and generates TypeScript clients with complete type safety. Eliminate manual API client maintenance, keep frontend and backend perfectly synchronized, and get instant IDE autocomplete for your entire Python API surface.
-
-**Two Development Flows:**
-
-1. **Client Generation**: Pure TypeScript client generation for any project
-2. **Full-Stack Integration**: Unified development with modern frontend frameworks through local proxy communication
-
-
-## Generation Example
-**Your FastAPI code**
+### 🌐 **Full-Stack Development** - Python + SvelteKit unified
 ```python
+import fluidkit
+fluidkit.integrate(app, enable_fullstack=True)  # Complete fullstack tooling
+```
+
+## The FluidKit Experience
+
+**Write your backend in Python:**
+```python
+from uuid import UUID
+from fastapi import FastAPI
 from pydantic import BaseModel
-from fastapi import FastAPI, Query
 
 app = FastAPI()
 
 class User(BaseModel):
-    id: int
+    id: UUID
     name: str
-    email: str
+    bio: str
 
-@app.get("/users/{user_id}")
-async def get_user(user_id: int, include_profile: bool = Query(False)) -> User:
-    """Get user by ID"""
-    return User(id=user_id, name="John", email="john@example.com")
+@app.post("/users")
+async def create_user(user: User) -> User:
+    # Your Python logic - pandas, ML, databases, etc.
+    return save_user_to_database(user)
+
+@app.get("/users/{user_id}/recommendations")  
+async def get_recommendations(user_id: UUID) -> list[Product]:
+    # Complex ML/AI logic in Python
+    return run_recommendation_engine(user_id)
 
 import fluidkit
-fluidkit.integrate(app)
+fluidkit.integrate(app, enable_fullstack=True)
 ```
 
-
-**Auto-generated typescript output**
-```typescript
-export interface User {
-  id: number;
-  name: string;
-  email: string;
-}
-
-/**
- * Get user by ID
- *
- * @param user_id
- * @param include_profile
- * @param options - Additional fetch options
- */
-export const get_user = async (
-  user_id: number, 
-  include_profile?: boolean, 
-  options?: RequestInit
-): Promise<ApiResult<User>> => {
-  let url = `${getBaseUrl()}/users/${user_id}`;
-
-  const searchParams = new URLSearchParams();
-  if (include_profile !== undefined) {
-    searchParams.set('include_profile', String(include_profile));
+**Use directly in SvelteKit like local functions:**
+```svelte
+<script>
+  import { createUser, getRecommendations } from '$lib/api/users';
+  
+  let user = { name: '', bio: '' };
+  let recommendations = [];
+  
+  async function handleSubmit() {
+    // Feels like calling a local function, but it's your Python FastAPI
+    const result = await createUser(user);
+    if (result.success) {
+      // Type-safe throughout - full IDE autocomplete
+      recommendations = await getRecommendations(result.data.id);
+    }
   }
-  if (searchParams.toString()) {
-    url += `?${searchParams.toString()}`;
-  }
-
-  const requestOptions: RequestInit = {
-    method: 'GET',
-    headers: options?.headers,
-    ...options
-  };
-
-  const response = await fetch(url, requestOptions);
-  return handleResponse(response);
-};
-```
-
-
----
-## Auto-Discovery
-
-FluidKit can automatically discover and bind APIRouters from files matching configurable patterns. This enables **co-location** where your API logic sits next to your frontend routes, eliminating manual router imports and keeping related code together.
-
-**Create discoverable API files:**
-```python
-# routes/users/_api.py  OR  routes/users/users.api.py
-from fastapi import APIRouter
-from pydantic import BaseModel
-
-router = APIRouter(prefix="/users")
-
-class User(BaseModel):
-    id: int
-    name: str
-
-@router.get("/{user_id}")
-async def get_user(user_id: int) -> User:
-    return User(id=user_id, name="John")
-```
-
-**SvelteKit-style folder structuring for fullstack development**
-```python
-# routes/users/[id]/profile.api.py - Dynamic parameters
-from fastapi import APIRouter
-
-router = APIRouter()
-
-@router.get("/details")
-async def get_profile(id: int):  # ✅ 'id' parameter required
-    return {"user_id": id, "profile": "details"}
-
-# routes/files/[...path]/handler.api.py - Rest parameters  
-@router.get("/download")
-async def download_file(path: str):  # ✅ 'path' parameter required
-    return {"file_path": path}
-```
-
-**Enable auto-discovery:**
-```json
-{
-  "autoDiscovery": {
-    "enabled": true,
-    "filePatterns": ["_*.py", "*.*.py"]
-  }
-}
-```
-
-**Folder Structure → FastAPI Route Translation:**
-
-| Folder Structure | Generated Route | Required Parameters |
-|------------------|-----------------|-------------------|
-| `routes/users/_api.py` | `/users/*` | None |
-| `routes/users/[id]/profile.api.py` | `/users/{id}/*` | `id` |
-| `routes/files/[...path]/handler.api.py` | `/files/{path:path}/*` | `path` |
-| `routes/(admin)/users/manage.api.py` | `/users/*` | None (groups ignored) |
-
-**Supported patterns:**
-1. Auto discovered files:
-  - `_api.py`, `_routes.py` (underscore prefix `_*.py`)
-  - `user.api.py`, `admin.service.py` (any dot pattern `*.*.py`)
-2. Valid folder naming patterns:
-  - `[id]`, `[userId]` (dynamic parameters)
-  - `[...path]`, `[...file]` (rest parameters)
-  - `(admin)`, `(app)` (route groups - organize without affecting URLs)
-
-**Benefits:**
-- ✅ **Zero boilerplate** - No manual router imports
-- ✅ **File co-location** - Place API files next to your frontend routes
-- ✅ **Parameter validation** - FluidKit ensures path parameters match function signatures
-- ✅ **Framework-style routing** - SvelteKit/Next.js conventions for Python
-- ✅ **Predictable routing** - Same behavior as manual `app.include_router()`
-
-> **Note:** FluidKit validates that functions in parameterized folders (e.g., `[id]`) include the required parameters in their signatures. Missing parameters will raise clear validation errors during startup.
-
----
-##  Full-Stack Development
-Inspired by [Next.js server actions](https://nextjs.org/docs/14/app/building-your-application/data-fetching/server-actions-and-mutations) and [Svelte's remote functions proposal](https://github.com/sveltejs/kit/discussions/13897), FluidKit enables cross-language full-stack development without restrictions.
-
-**Example with SvelteKit**
-
-```typescript
-// +page.server.ts - Server-side data loading
-import { getUser, createOrder } from '$lib/api/users';
-
-export const load = async () => {
-  const user = await getUser(123); // Direct FastAPI call
-  return { user: user.data };
-};
-```
-
-```typescript
-// +page.svelte - Client-side interactions  
-<script lang="ts">
-import { updateProfile } from '$lib/api/users';
-
-async function handleUpdate() {
-  const result = await updateProfile(data); // Proxied through SvelteKit into FastAPI
-}
 </script>
 
-<!-- Markup here -->
-<div>...</div>
+<form on:submit|preventDefault={handleSubmit}>
+  <input bind:value={user.name} placeholder="Name" />
+  <textarea bind:value={user.bio} placeholder="Bio"></textarea>
+  <button type="submit">Create User</button>
+</form>
+
+{#each recommendations.data || [] as product}
+  <ProductCard {product} />
+{/each}
 ```
 
-The same generated client works seamlessly in both server (direct FastAPI communication) and browser (proxied) environments. By detecting where its been executed and using appropriate baseurl.
-
-
----
-## Configuration
-
-FluidKit behavior is controlled by `fluid.config.json`:
-
-```json
-{
-  "framework": null,                 // "sveltekit" | "nextjs" for full-stack
-  "target": "development",           // Which environment to build for
-  "output": {
-    "strategy": "mirror",            // File placement strategy
-    "location": ".fluidkit"          // FluidKit output directory (runtime.ts, etc.)
-  },
-  "backend": {
-    "host": "localhost",             // FastAPI server host
-    "port": 8000                     // FastAPI server port
-  },
-  "environments": {
-    "development": {
-      "mode": "unified",             // Same codebase vs separate repos
-      "apiUrl": "/api"               // API base URL for this environment
-    },
-    "production": {
-      "mode": "separate",
-      "apiUrl": "https://api.example.com"
-    }
-  },
-
-  "include": [                       // Auto-discovery scan paths
-    "src/**/*.py",
-    "lib/**/*.py"
-  ],
-  "exclude": [                       // Exclude patterns
-    "**/__pycache__/**",
-    "**/*.test.py"
-  ],
-  "autoDiscovery": {
-    "enabled": false,                // Enable +*.py auto-discovery
-    "filePattern": "+*.py"           // File pattern to scan
-  },
+**FluidKit automatically generates:**
+```typescript
+// Full type safety from Python → TypeScript
+export interface User {
+  id: FluidTypes.UUID;
+  name: string;
+  bio: string;
 }
+
+export const createUser = async (user: User): Promise<ApiResult<User>> => {
+  // Environment-aware: direct FastAPI in SSR, proxied in browser
+};
 ```
 
-**Configuration Reference:**
+## ✨ What's New in v0.2.4
 
-| Field | Values | Description |
-|-------|--------|-------------|
-| `target` | `"development"` \| `"production"` | Which environment to build for |
-| `output.strategy` | `"mirror"` \| `"co-locate"` | Where to place generated client files |
-| `output.location` | `".fluidkit"` \| `"src/lib"` | Directory for runtime.ts and mirror structure |
-| `mode` | `"unified"` \| `"separate"` | Same codebase vs separate frontend/backend repos |
-| `framework` | `"sveltekit"` \| `"nextjs"` | Enable full-stack integration |
-| `include` | `["src/**/*.py"]` | Paths to scan for auto-discovery |
-| `exclude` | `["**/*.test.py"]` | Patterns to exclude from scanning |
-| `autoDiscovery.enabled` | `true` \| `false` | Enable `+*.py` auto-discovery |
-| `autoDiscovery.filePattern` | `"+*.py"` | File pattern for auto-discovery |
+- 🔄 **[Streaming Support](docs/streaming.md)** - Server-Sent Events, file downloads, JSON streaming
+- 🏷️ **[FluidTypes Namespace](docs/types.md)** - Clean handling of external types (UUID, Decimal, DateTime)
+- 📁 **[Enhanced Auto-Discovery](docs/auto-discovery.md)** - SvelteKit-style folder routing with parameter validation
+- ⚡ **Simplified Configuration** - Zero config for client generation, rich config for fullstack
 
+## 🚀 Key Features
 
-**Mode Explanation:**
-- **`"unified"`**: Frontend and backend in same codebase (full-stack apps)
-- **`"separate"`**: Generated code can be copied to separate frontend repo
+- **Unified Development Experience** - Write Python, get modern SvelteKit web apps
+- **Complete Type Safety** - Python types → TypeScript interfaces automatically  
+- **Environment-Aware Proxying** - Same client works in SSR and browser seamlessly
+- **Streaming First-Class** - SSE, file downloads, JSON streaming support
+- **Smart External Types** - UUID, Decimal, DateTime via clean `FluidTypes` namespace
+- **Auto-Discovery** - SvelteKit-style file-based routing patterns
+- **Zero Node.js Knowledge Required** - Pure Python backend development
+- **Highly Optimized** - SvelteKit's SSR, hydration, code splitting, and performance
 
-**Generation Strategies:**
+## 🛠️ Two Development Modes
+
+### **Client Generation Only**
+Perfect for existing projects, microservices, or when frontend/backend deploy separately:
 
 ```python
-# Your Python project structure
-src/
-├── routes/
-│   ├── users.py       # @app.get("/users")
-│   └── orders.py      # @app.get("/orders") 
-└── models/
-    └── user.py        # class User(BaseModel)
+# Generates portable TypeScript clients
+fluidkit.integrate(app)
 ```
+- Clean `.fluidkit/` output directory
+- Copy generated clients to any frontend project  
+- Works with React, Vue, vanilla TypeScript, etc.
+- Full type safety across the API boundary
 
-**Co-locate Strategy** (`"strategy": "co-locate"`):
+### **Full-Stack Development**
+Unified Python + SvelteKit development with seamless integration:
+
+```python
+# Enables complete fullstack tooling
+fluidkit.integrate(app, enable_fullstack=True)
 ```
-src/
-├── routes/
-│   ├── users.py
-│   ├── users.ts       # ✅ Generated next to Python file
-│   ├── orders.py
-│   └── orders.ts      # ✅ Generated next to Python file
-└── models/
-    ├── user.py
-    └── user.ts        # ✅ Generated next to Python file
+- Auto-generated SvelteKit proxy routes
+- Environment-aware client (SSR + browser)
+- Hot reload across frontend and backend
+- Production deployment optimization
+- Auto-discovery of API routes
 
-.fluidkit/             # ✅ FluidKit utilities
-└── runtime.ts
-```
+## 📚 Documentation
 
-**Mirror Strategy** (`"strategy": "mirror"`):
-```
-src/                   # Your Python code (unchanged)
-├── routes/
-│   ├── users.py
-│   └── orders.py
-└── models/
-    └── user.py
+| Guide | Description |
+|-------|-------------|
+| **[Full-Stack Development](docs/fullstack.md)** | Complete SvelteKit integration, deployment, environment setup |
+| **[Streaming Clients](docs/streaming.md)** | SSE, file downloads, JSON streaming patterns |
+| **[Configuration](docs/configuration.md)** | Config reference, strategies, environments |
+| **[Auto-Discovery](docs/auto-discovery.md)** | File patterns, routing conventions, parameter validation |
+| **[Type System](docs/types.md)** | FluidTypes namespace, external type handling |
 
-.fluidkit/             # ✅ Complete generated structure
-├── runtime.ts         # ✅ FluidKit utilities
-├── routes/
-│   ├── users.ts
-│   └── orders.ts
-└── models/
-    └── user.ts
-```
+## 🛣️ Roadmap
 
-**Full-stack projects** add framework integration:
-```json
-{
-  "target": "development",
-  "framework": "sveltekit",          // Enable framework integration
-  "environments": {
-    "development": {
-      "mode": "unified",             // Same codebase with proxy support
-      "apiUrl": "/api"
-    }
-  }
-}
-```
-
-This auto-generates proxy routes and environment-aware runtime utilities.
-
-
----
-## Language Extensibility
-
-FluidKit generates an **intermediate representation (IR)** from FastAPI introspection, enabling client generation for multiple languages possible in the future:
-
-- ✅ **TypeScript** (current)
-- 🚧 **Python** (planned)
-- 🚧 **JavaScript with JSDoc** (planned)  
-- 🚧 **Go** (planned)
+- ✅ **TypeScript Client Generation** (current)
+- ✅ **SvelteKit Full-Stack Integration** (current)  
+- 🚧 **CLI Tooling** - Project templates, deployment orchestration
+- 🚧 **Python Client Generation** - Full Python ecosystem
+- 🚧 **Advanced Streaming** - WebSockets, real-time features
 
 ## Quick Start
 
-**Basic Integration:**
 ```python
+# 1. Install FluidKit
+pip install fluidkit
+
+# 2. Add to your FastAPI app
 import fluidkit
-from fastapi import FastAPI
+fluidkit.integrate(app, enable_fullstack=True)
 
-app = FastAPI()
-
-# Your existing routes...
-
-# Generate TypeScript clients
-fluidkit.integrate(app)
+# 3. Start developing
+# - Your Python API functions become importable in SvelteKit as co-located ts files will be created with client code
+# - Full type safety throughout
+# - Environment-aware proxying handles SSR/CSR automatically
+# - Access entire JavaScript ecosystem for UI
 ```
 
-**Full-Stack Integration:**
-```python
-# First, create fluid.config.json with framework: "sveltekit"
-fluidkit.integrate(app)  # Auto-generates proxy routes + clients
-```
+---
 
-**Generated Structure:**
-```
-.fluidkit/
-├── runtime.ts           # Environment-aware utilities
-└── api/
-    ├── users.ts         # Generated from /api/users routes
-    └── orders.ts        # Generated from /api/orders routes
-
-# Framework flow also generates:
-src/routes/api/[...path]/+server.ts  # SvelteKit proxy
-```
-
-## Key Features
-
-- **Runtime Introspection**: No AST parsing, uses FastAPI's own dependency system
-- **Complete Type Safety**: Preserves Pydantic models, validation constraints, and return types
-- **Environment Aware**: Same client code works in server and browser contexts
-- **Framework Agnostic**: Adapts to SvelteKit, Next.js, and other frameworks
-- **Zero Configuration**: Works out of the box, configure only when needed
-
-**The result**: Full Python ecosystem access in JavaScript projects with complete IDE support and type safety.
+**Build modern, type-safe web applications using the Python ecosystem you know + the SvelteKit performance you want.**

@@ -29,14 +29,3 @@ class GenerationPaths:
     # Future language runtimes
     PYTHON_RUNTIME = "runtime.py"
     JAVASCRIPT_RUNTIME = "runtime.js"
-
-COMMON_TYPE_MAP = {
-    "UUID": "string",
-    "Decimal": "number",
-    "datetime": "string",
-    "date": "string", 
-    "Path": "string",
-    "EmailStr": "string",
-    "HttpUrl": "string",
-    "PaymentCardNumber": "string"
-}

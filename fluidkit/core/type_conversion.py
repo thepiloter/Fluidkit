@@ -249,41 +249,41 @@ def _check_common_external_type(py_type: type) -> Optional[FieldAnnotation]:
     """
     # Python built-ins (always available)
     import uuid
+    from pathlib import Path
     from decimal import Decimal
     from datetime import datetime, date
-    from pathlib import Path
     
     if py_type is uuid.UUID:
         return FieldAnnotation(
-            custom_type="UUID",
+            custom_type="FluidTypes.UUID",
             is_common_external=True,
             class_reference=py_type
         )
     
     if py_type is Decimal:
         return FieldAnnotation(
-            custom_type="Decimal", 
+            custom_type="FluidTypes.Decimal",
             is_common_external=True,
             class_reference=py_type
         )
     
     if py_type is datetime:
         return FieldAnnotation(
-            custom_type="datetime",
+            custom_type="FluidTypes.DateTime",
             is_common_external=True,
             class_reference=py_type
         )
     
     if py_type is date:
         return FieldAnnotation(
-            custom_type="date",
+            custom_type="FluidTypes.Date",
             is_common_external=True,
             class_reference=py_type
         )
     
     if py_type is Path:
         return FieldAnnotation(
-            custom_type="Path",
+            custom_type="FluidTypes.Path",
             is_common_external=True,
             class_reference=py_type
         )
@@ -293,13 +293,13 @@ def _check_common_external_type(py_type: type) -> Optional[FieldAnnotation]:
         from pydantic import EmailStr, HttpUrl
         if py_type is EmailStr:
             return FieldAnnotation(
-                custom_type="EmailStr",
+                custom_type="FluidTypes.EmailStr",
                 is_common_external=True,
                 class_reference=py_type
             )
         if py_type is HttpUrl:
             return FieldAnnotation(
-                custom_type="HttpUrl", 
+                custom_type="FluidTypes.HttpUrl",
                 is_common_external=True,
                 class_reference=py_type
             )
@@ -310,7 +310,7 @@ def _check_common_external_type(py_type: type) -> Optional[FieldAnnotation]:
         from pydantic_extra_types.payment import PaymentCardNumber
         if py_type is PaymentCardNumber:
             return FieldAnnotation(
-                custom_type="PaymentCardNumber",
+                custom_type="FluidTypes.PaymentCardNumber",
                 is_common_external=True,
                 class_reference=py_type
             )
