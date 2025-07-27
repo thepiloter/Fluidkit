@@ -31,7 +31,6 @@ async def stream_notifications(user_id: int):
     
     async def event_generator():
         while True:
-            # Get notifications from database/queue
             notifications = await get_user_notifications(user_id)
             
             for notification in notifications:
@@ -40,41 +39,9 @@ async def stream_notifications(user_id: int):
                     "data": json.dumps(notification.dict())
                 }
             
-            await asyncio.sleep(1)  # Poll interval
+            await asyncio.sleep(1)
     
     return EventSourceResponse(event_generator())
-```
-
-### Generated TypeScript Client
-
-```typescript
-import type { SSECallbacks, SSEConnection } from './.fluidkit/runtime';
-
-/**
- * Stream real-time notifications
- * Server-Sent Events endpoint
- */
-export const stream_notifications = (
-  user_id: number,
-  callbacks: SSECallbacks,
-  options?: SSERequestInit
-): SSEConnection => {
-  const url = `${getBaseUrl()}/notifications/stream?user_id=${user_id}`;
-  
-  const eventSource = new EventSource(url);
-  
-  if (callbacks.onMessage) {
-    eventSource.addEventListener('message', callbacks.onMessage);
-  }
-  if (callbacks.onError) {
-    eventSource.addEventListener('error', callbacks.onError);
-  }
-  if (callbacks.onOpen) {
-    eventSource.addEventListener('open', callbacks.onOpen);
-  }
-  
-  return eventSource;
-};
 ```
 
 ### Usage in SvelteKit
@@ -83,8 +50,9 @@ export const stream_notifications = (
 <script>
   import { stream_notifications } from './notifications.api';
   
-  let notifications = [];
-  let connection = null;
+  let notifications = $state([]);
+  let connection = $state(null);
+  let isConnected = $state(false);
   
   function startNotifications() {
     connection = stream_notifications(userId, {
@@ -92,8 +60,12 @@ export const stream_notifications = (
         const notification = JSON.parse(event.data);
         notifications = [notification, ...notifications];
       },
+      onOpen: () => {
+        isConnected = true;
+      },
       onError: (error) => {
         console.error('Connection error:', error);
+        isConnected = false;
       }
     });
   }
@@ -102,12 +74,21 @@ export const stream_notifications = (
     if (connection) {
       connection.close();
       connection = null;
+      isConnected = false;
     }
   }
 </script>
 
-<button on:click={startNotifications}>Start Live Updates</button>
-<button on:click={stopNotifications}>Stop</button>
+<button onclick={startNotifications} disabled={isConnected}>
+  Start Live Updates
+</button>
+<button onclick={stopNotifications} disabled={!isConnected}>
+  Stop
+</button>
+
+{#if isConnected}
+  <p class="status">🟢 Connected</p>
+{/if}
 
 {#each notifications as notification}
   <div class="notification">
@@ -122,17 +103,13 @@ export const stream_notifications = (
 
 ```python
 from fastapi.responses import StreamingResponse
-from fastapi import APIRouter
 import aiofiles
-
-router = APIRouter()
 
 @router.get("/files/{file_id}/download")
 async def download_file(file_id: str):
     """Stream file download"""
     
     file_path = await get_file_path(file_id)
-    file_size = await get_file_size(file_path)
     
     async def file_streamer():
         async with aiofiles.open(file_path, 'rb') as file:
@@ -142,37 +119,8 @@ async def download_file(file_id: str):
     return StreamingResponse(
         file_streamer(),
         media_type='application/octet-stream',
-        headers={
-            'Content-Disposition': f'attachment; filename="{file_path.name}"',
-            'Content-Length': str(file_size)
-        }
+        headers={'Content-Disposition': f'attachment; filename="{file_path.name}"'}
     )
-```
-
-### Generated TypeScript Client
-
-```typescript
-/**
- * Stream file download
- * File download endpoint
- */
-export const download_file = async (
-  file_id: string,
-  options?: RequestInit
-): Promise<Blob> => {
-  const url = `${getBaseUrl()}/files/${file_id}/download`;
-  
-  const response = await fetch(url, {
-    method: 'GET',
-    ...options
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Download failed: ${response.statusText}`);
-  }
-  
-  return response.blob();
-};
 ```
 
 ### Usage in SvelteKit
@@ -181,30 +129,39 @@ export const download_file = async (
 <script>
   import { download_file } from './files.api';
   
+  let downloading = $state(false);
+  let error = $state('');
+  
   async function handleDownload(fileId, filename) {
+    downloading = true;
+    error = '';
+    
     try {
       const blob = await download_file(fileId);
       
-      // Create download link
+      // Trigger download
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;
-      document.body.appendChild(a);
       a.click();
       
-      // Cleanup
-      document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Download failed:', error);
+    } catch (err) {
+      error = 'Download failed';
+    } finally {
+      downloading = false;
     }
   }
 </script>
 
-<button on:click={() => handleDownload('123', 'report.pdf')}>
-  Download Report
+<button onclick={() => handleDownload('123', 'report.pdf')} disabled={downloading}>
+  {downloading ? 'Downloading...' : 'Download Report'}
 </button>
+
+{#if error}
+  <p class="error">{error}</p>
+{/if}
 ```
 
 ## JSON Data Streaming
@@ -212,15 +169,11 @@ export const download_file = async (
 ### Python Implementation
 
 ```python
-from fastapi.responses import StreamingResponse
-import json
-
 @router.get("/analytics/stream")
 async def stream_analytics_data():
     """Stream large analytics dataset"""
     
     async def data_generator():
-        # Stream large dataset in chunks
         async for batch in get_analytics_batches():
             for record in batch:
                 yield json.dumps(record.dict()) + '\n'
@@ -231,86 +184,53 @@ async def stream_analytics_data():
     )
 ```
 
-### Generated TypeScript Client
-
-```typescript
-/**
- * Stream large analytics dataset
- * JSON streaming endpoint
- */
-export const stream_analytics_data = async (
-  callbacks: StreamingCallbacks<AnalyticsRecord>,
-  options?: RequestInit
-): Promise<void> => {
-  const url = `${getBaseUrl()}/analytics/stream`;
-  
-  const response = await fetch(url, { method: 'GET', ...options });
-  
-  if (!response.ok) {
-    throw new Error(`Streaming failed: ${response.statusText}`);
-  }
-  
-  const reader = response.body?.getReader();
-  const decoder = new TextDecoder();
-  
-  try {
-    while (true) {
-      const { done, value } = await reader!.read();
-      if (done) break;
-      
-      const text = decoder.decode(value, { stream: true });
-      const lines = text.split('\n').filter(line => line.trim());
-      
-      for (const line of lines) {
-        try {
-          const record = JSON.parse(line);
-          callbacks.onChunk?.(record);
-        } catch (e) {
-          callbacks.onError?.(new Error(`Invalid JSON: ${line}`));
-        }
-      }
-    }
-    callbacks.onComplete?.();
-  } catch (error) {
-    callbacks.onError?.(error);
-  }
-};
-```
-
 ### Usage in SvelteKit
 
 ```svelte
 <script>
   import { stream_analytics_data } from './analytics.api';
   
-  let records = [];
-  let isStreaming = false;
+  let records = $state([]);
+  let isStreaming = $state(false);
+  let error = $state('');
   
-  async function startStreaming() {
+  function startStreaming() {
     isStreaming = true;
+    error = '';
     records = [];
     
-    await stream_analytics_data({
+    stream_analytics_data({
       onChunk: (record) => {
         records = [...records, record];
       },
-      onError: (error) => {
-        console.error('Streaming error:', error);
+      onError: (err) => {
+        error = 'Streaming failed';
         isStreaming = false;
       },
       onComplete: () => {
-        console.log('Streaming complete');
         isStreaming = false;
       }
     });
   }
 </script>
 
-<button on:click={startStreaming} disabled={isStreaming}>
+<button onclick={startStreaming} disabled={isStreaming}>
   {isStreaming ? 'Streaming...' : 'Load Analytics Data'}
 </button>
 
-<div>Records loaded: {records.length}</div>
+{#if error}
+  <p class="error">{error}</p>
+{/if}
+
+<div class="counter">Records loaded: {records.length}</div>
+
+{#if records.length > 0}
+  <div class="records">
+    {#each records.slice(-5) as record}
+      <div class="record">{record.name}: {record.value}</div>
+    {/each}
+  </div>
+{/if}
 ```
 
 ## Benefits

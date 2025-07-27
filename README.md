@@ -41,17 +41,12 @@ app = FastAPI()
 class User(BaseModel):
     id: UUID
     name: str
-    bio: str
+    email: str
 
-@app.post("/users")
-async def create_user(user: User) -> User:
-    # Your Python logic - pandas, ML, databases, etc.
-    return save_user_to_database(user)
-
-@app.get("/users/{user_id}/recommendations")  
-async def get_recommendations(user_id: UUID) -> list[Product]:
-    # Complex ML/AI logic in Python
-    return run_recommendation_engine(user_id)
+@app.get("/users/{user_id}")
+async def get_user(user_id: UUID) -> User:
+    # Your Python logic - database, validation, etc.
+    return fetch_user_from_database(user_id)
 
 import fluidkit
 fluidkit.integrate(app, enable_fullstack=True)
@@ -60,30 +55,37 @@ fluidkit.integrate(app, enable_fullstack=True)
 **Use directly in SvelteKit like local functions:**
 ```svelte
 <script>
-  import { createUser, getRecommendations } from '$lib/api/users';
+  import { get_user } from './users.api';
   
-  let user = { name: '', bio: '' };
-  let recommendations = [];
+  let userId = $state('');
+  let user = $state(null);
+  let error = $state('');
   
-  async function handleSubmit() {
-    // Feels like calling a local function, but it's your Python FastAPI
-    const result = await createUser(user);
-    if (result.success) {
-      // Type-safe throughout - full IDE autocomplete
-      recommendations = await getRecommendations(result.data.id);
-    }
+  function loadUser() {
+    error = '';
+    get_user(userId).then(result => {
+      if (result.success) {
+        user = result.data;
+      } else {
+        error = result.error;
+      }
+    });
   }
 </script>
 
-<form on:submit|preventDefault={handleSubmit}>
-  <input bind:value={user.name} placeholder="Name" />
-  <textarea bind:value={user.bio} placeholder="Bio"></textarea>
-  <button type="submit">Create User</button>
-</form>
+<input bind:value={userId} placeholder="Enter user ID" />
+<button onclick={loadUser}>Load User</button>
 
-{#each recommendations.data || [] as product}
-  <ProductCard {product} />
-{/each}
+{#if error}
+  <p style="color: red;">{error}</p>
+{/if}
+
+{#if user}
+  <div>
+    <h3>{user.name}</h3>
+    <p>{user.email}</p>
+  </div>
+{/if}
 ```
 
 **FluidKit automatically generates:**
@@ -92,10 +94,10 @@ fluidkit.integrate(app, enable_fullstack=True)
 export interface User {
   id: FluidTypes.UUID;
   name: string;
-  bio: string;
+  email: string;
 }
 
-export const createUser = async (user: User): Promise<ApiResult<User>> => {
+export const get_user = async (user_id: FluidTypes.UUID): Promise<ApiResult<User>> => {
   // Environment-aware: direct FastAPI in SSR, proxied in browser
 };
 ```

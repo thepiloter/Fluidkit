@@ -147,6 +147,7 @@ user.api.py, admin.routes.py, data.service.py
 }
 ```
 
+---
 ## Complete Example
 
 ### Python API Definition
@@ -163,15 +164,6 @@ class User(BaseModel):
     id: UUID
     name: str
     email: str
-
-class CreateUserRequest(BaseModel):
-    name: str
-    email: str
-
-@router.post("/")
-async def create_user(data: CreateUserRequest) -> User:
-    """Create a new user"""
-    return User(id=uuid4(), name=data.name, email=data.email)
 
 @router.get("/{user_id}")
 async def get_user(user_id: UUID) -> User:
@@ -196,31 +188,14 @@ export interface User {
   email: string;
 }
 
-export interface CreateUserRequest {
-  name: string;
-  email: string;
-}
-
-/**
- * Create a new user
- */
-export const create_user = async (
-  data: CreateUserRequest,
-  options?: RequestInit
-): Promise<ApiResult<User>> => {
-  // Environment-aware implementation
-};
-
 export const get_user = async (
-  user_id: FluidTypes.UUID,
-  options?: RequestInit  
+  user_id: FluidTypes.UUID
 ): Promise<ApiResult<User>> => {
-  // Auto-generated client implementation
+  // Environment-aware: direct FastAPI in SSR, proxied in browser
 };
 
 export const get_recommendations = async (
-  user_id: FluidTypes.UUID,
-  options?: RequestInit
+  user_id: FluidTypes.UUID
 ): Promise<ApiResult<Product[]>> => {
   // Type-safe client with ML results
 };
@@ -231,45 +206,59 @@ export const get_recommendations = async (
 ```svelte
 <!-- src/routes/users/+page.svelte -->
 <script>
-  import { create_user, get_user, get_recommendations } from './user.api';
+  import { get_user, get_recommendations } from './user.api';
   
-  let formData = { name: '', email: '' };
-  let selectedUser = null;
-  let recommendations = [];
+  let userId = $state('123e4567-e89b-12d3-a456-426614174000');
+  let userPromise = $state(null);
+  let recommendationsPromise = $state(null);
   
-  async function createUser() {
-    const result = await create_user(formData);
-    if (result.success) {
-      selectedUser = result.data;
-      loadRecommendations(result.data.id);
-    }
+  function loadUser() {
+    userPromise = get_user(userId);
   }
   
-  async function loadRecommendations(userId) {
-    const recs = await get_recommendations(userId);
-    if (recs.success) {
-      recommendations = recs.data;
+  function loadRecommendations() {
+    if (userId) {
+      recommendationsPromise = get_recommendations(userId);
     }
   }
 </script>
 
-<form on:submit|preventDefault={createUser}>
-  <input bind:value={formData.name} placeholder="Name" />
-  <input bind:value={formData.email} placeholder="Email" type="email" />
-  <button type="submit">Create User</button>
-</form>
+<input bind:value={userId} placeholder="Enter user ID" />
+<button onclick={loadUser}>Load User</button>
+<button onclick={loadRecommendations}>Get Recommendations</button>
 
-{#if selectedUser}
-  <h2>Welcome, {selectedUser.name}!</h2>
-  
-  {#if recommendations.length > 0}
-    <h3>Recommended for you:</h3>
-    {#each recommendations as product}
-      <ProductCard {product} />
-    {/each}
-  {/if}
+<!-- Clean async data loading with #await -->
+{#if userPromise}
+  {#await userPromise}
+    <p>Loading user...</p>
+  {:then result}
+    {#if result.success}
+      <div class="user-card">
+        <h2>{result.data.name}</h2>
+        <p>{result.data.email}</p>
+      </div>
+    {:else}
+      <p class="error">Error: {result.error}</p>
+    {/if}
+  {:catch error}
+    <p class="error">Failed to load user</p>
+  {/await}
+{/if}
+
+{#if recommendationsPromise}
+  {#await recommendationsPromise}
+    <p>Finding recommendations...</p>
+  {:then result}
+    {#if result.success && result.data.length > 0}
+      <h3>Recommended for you:</h3>
+      {#each result.data as product}
+        <ProductCard {product} />
+      {/each}
+    {/if}
+  {/await}
 {/if}
 ```
+
 
 ## Environment-Aware Proxying
 
