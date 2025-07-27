@@ -14,9 +14,9 @@ from typing import List, Dict, Tuple, Optional
 
 from fluidkit.introspection.routes import route_to_node
 from fluidkit.introspection.models import discover_models_from_routes
-from fluidkit.core.config import load_fluidkit_config, FluidKitConfig
 from fluidkit.core.schema import FluidKitApp, RouteNode, LanguageType
 from fluidkit.core.autodiscovery import auto_discover_and_bind_routes
+from fluidkit.core.config import load_fluidkit_config, ensure_config_for_mode, FluidKitConfig
 
 
 logger = logging.getLogger(__name__)
@@ -24,25 +24,65 @@ logger = logging.getLogger(__name__)
 
 def integrate(
     app: FastAPI,
-    lang: Optional[str] = None,  # Default to typescript when None
-    config_path: Optional[str] = None,
+    enable_fullstack: bool = False,
+    lang: Optional[str] = None,
     project_root: Optional[str] = None,
     verbose: bool = False,
     **options
 ) -> Tuple[FluidKitApp, Dict[str, str]]:
     """
-    Integrate FluidKit with FastAPI app using configuration-driven approach.
+    Integrate FluidKit with FastAPI app for TypeScript client generation.
+    
+    Supports two modes:
+    - Code Generation: Generates portable TypeScript clients for any project
+    - Full-Stack: Generates clients + SvelteKit proxy routes for unified development
     
     Args:
-        app: FastAPI application instance
+        app: FastAPI application instance to introspect
+        enable_fullstack: Whether to enable full-stack SvelteKit integration
+            - False (default): Generates TypeScript clients only
+            - True: Generates clients + SvelteKit proxy routes + auto-discovery
         lang: Target language for code generation (defaults to "typescript")
-        config_path: Path to fluid.config.json (auto-detected if None)
         project_root: Project root directory (defaults to current directory)
-        verbose: Enable detailed logging
-        **options: Additional options for backward compatibility
-        
+        verbose: Enable detailed logging output
+        **options: Additional options for backward compatibility:
+            - strategy: "mirror" | "co-locate" (overrides config)
+            - target: "development" | "production" (overrides config)
+            - framework: "sveltekit" (overrides config)
+            - auto_discovery: bool (overrides config)
+            
     Returns:
-        (FluidKitApp, generated_files_dict)
+        Tuple[FluidKitApp, Dict[str, str]]: 
+            - FluidKitApp: Complete introspection results
+            - Dict[str, str]: Generated files mapping (file_path -> content)
+            
+    Config File Behavior:
+        - If no fluid.config.json exists: Creates appropriate config based on enable_fullstack
+        - If config exists and enable_fullstack=True: Upgrades config without losing customizations
+        - If config exists and enable_fullstack=False: Uses existing config as-is
+        
+    Examples:
+        # Code generation only (simple)
+        fluidkit.integrate(app)
+        # Creates: .fluidkit/runtime.ts + generated TypeScript clients
+        
+        # Full-stack development
+        fluidkit.integrate(app, enable_fullstack=True)
+        # Creates: clients + SvelteKit proxy routes + auto-discovery
+        
+        # Custom configuration
+        fluidkit.integrate(app, strategy="co-locate", verbose=True)
+        
+        # Upgrade existing simple config to full-stack
+        fluidkit.integrate(app, enable_fullstack=True)  # Preserves existing settings
+        
+    Raises:
+        NotImplementedError: If unsupported language specified
+        ValueError: If configuration validation fails
+        
+    Note:
+        The integrate() function is idempotent - calling it multiple times is safe.
+        Config upgrades preserve user customizations (ports, paths, etc.).
     """
     if verbose:
         logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
@@ -54,23 +94,23 @@ def integrate(
         project_root = str(Path(project_root).resolve())
     
     # Load FluidKit configuration
-    config = load_fluidkit_config(project_root)
+    config = ensure_config_for_mode(enable_fullstack, project_root)
     
     # Override config with explicit parameters (backward compatibility)
     config_overrides = {
-        'strategy': options.pop('strategy', None),
         'target': options.pop('target', None),
+        'strategy': options.pop('strategy', None),
         'framework': options.pop('framework', None),
         'auto_discovery': options.pop('auto_discovery', None),
     }
 
     # Apply config overrides
-    if config_overrides['strategy']:
-        config.output.strategy = config_overrides['strategy']
     if config_overrides['target']:
         config.target = config_overrides['target']
     if config_overrides['framework']:
         config.framework = config_overrides['framework']
+    if config_overrides['strategy']:
+        config.output.strategy = config_overrides['strategy']
     if config_overrides['auto_discovery'] is not None:
         config.autoDiscovery.enabled = config_overrides['auto_discovery']
     

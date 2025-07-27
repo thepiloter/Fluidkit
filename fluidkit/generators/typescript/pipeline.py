@@ -1,23 +1,19 @@
-# v2/generators/pipeline.py
-
 """
 FluidKit V2 Generation Pipeline
 
-Orchestrates import generation, interface generation, and fetch wrapper generation
+Orchestrates import generation, interface generation, and client wrapper generation
 into complete TypeScript files with proper import statements.
 """
 
 import json
 from pathlib import Path
-from datetime import datetime
 from typing import Dict, List, Union, Optional
 
 from fluidkit.core.config import get_version
 from fluidkit.core.config import FluidKitConfig
 from fluidkit.core.schema import FluidKitApp, RouteNode, ModelNode
-from fluidkit.core.constants import FluidKitRuntime, GenerationPaths
 from fluidkit.generators.typescript.interfaces import generate_interface
-from fluidkit.generators.typescript.clients import generate_fetch_wrapper
+from fluidkit.generators.typescript.clients import generate_client_wrapper
 from fluidkit.generators.typescript.imports import ImportContext, generate_imports_for_file
 
 
@@ -65,9 +61,9 @@ def generate_typescript_files(
         if content.strip():
             generated_files[ts_file_path] = content
     
-    # Generate FluidKit runtime
+    # Generate FluidKit runtime with streaming support
     runtime_path = _get_runtime_file_path(config, project_root)
-    generated_files[runtime_path] = _generate_fluidkit_runtime(config)
+    generated_files[runtime_path] = _generate_fluidkit_runtime(config, fluid_app)
     
     # Generate proxy files for framework flow
     if config.should_generate_proxy:
@@ -126,7 +122,7 @@ def _generate_file_content(
     
     if not models and not routes:
         return ""
-    
+
     all_nodes = models + routes
     source_location = all_nodes[0].location
     
@@ -136,20 +132,45 @@ def _generate_file_content(
         source_location=source_location,
     )
     
+    # Check if we need runtime imports and collect used types
     needs_runtime = len(routes) > 0
+    all_used_runtime_types = set()
     
     sections = []
     
-    # Generate imports
-    imports = generate_imports_for_file(
-        nodes=all_nodes,
-        context=context,
-        fluid_app=fluid_app,
-        needs_runtime=needs_runtime,
-        **runtime_config
-    )
-    if imports:
-        sections.append(imports)
+    # Generate client wrappers and collect used types
+    if routes:
+        client_sections = []
+        for route in routes:
+            client_content, used_types = generate_client_wrapper(route, **runtime_config)
+            if client_content:
+                client_sections.append(client_content)
+                all_used_runtime_types.update(used_types)
+        
+        imports = generate_imports_for_file(
+            nodes=all_nodes,
+            context=context,
+            fluid_app=fluid_app,
+            needs_runtime=needs_runtime,
+            runtime_types_used=list(all_used_runtime_types),
+            **runtime_config
+        )
+        if imports:
+            sections.append(imports)
+        
+        if client_sections:
+            sections.append("\n\n".join(client_sections))
+    else:
+        # No routes, just generate regular imports for models
+        imports = generate_imports_for_file(
+            nodes=all_nodes,
+            context=context,
+            fluid_app=fluid_app,
+            needs_runtime=False,
+            **runtime_config
+        )
+        if imports:
+            sections.append(imports)
     
     # Generate interfaces
     if models:
@@ -160,16 +181,6 @@ def _generate_file_content(
                 interface_sections.append(interface_content)
         if interface_sections:
             sections.append("\n\n".join(interface_sections))
-    
-    # Generate fetch wrappers
-    if routes:
-        fetch_sections = []
-        for route in routes:
-            fetch_content = generate_fetch_wrapper(route, **runtime_config)
-            if fetch_content:
-                fetch_sections.append(fetch_content)
-        if fetch_sections:
-            sections.append("\n\n".join(fetch_sections))
     
     return "\n\n".join(sections)
 
@@ -202,18 +213,37 @@ def _get_runtime_file_path(config: FluidKitConfig, project_root: str) -> str:
     return str(runtime_dir / "runtime.ts")
 
 
-def _generate_fluidkit_runtime(config: FluidKitConfig) -> str:
-    """Generate environment-aware FluidKit TypeScript runtime."""
+def _generate_fluidkit_runtime(config: FluidKitConfig, fluid_app: FluidKitApp) -> str:
+    """Generate environment-aware FluidKit TypeScript runtime with streaming support."""
+    
+    # Check if we have any streaming routes
+    has_streaming_routes = any(route.is_streaming for route in fluid_app.routes)
+    
+    # Generate base runtime
+    base_runtime = _generate_base_runtime(config)
+    
+    # Add streaming runtime if needed
+    if has_streaming_routes:
+        streaming_runtime = _generate_streaming_runtime()
+        return base_runtime + streaming_runtime
+    else:
+        return base_runtime
+
+
+def _generate_base_runtime(config: FluidKitConfig) -> str:
+    """Generate base FluidKit runtime utilities."""
     
     # Generate getBaseUrl function based on flow type
     if config.is_fullstack_config:
         base_url_fn = _generate_framework_aware_base_url(config)
     else:
         base_url_fn = _generate_normal_flow_base_url(config)
+
+    common_types_exports = _generate_common_types_exports()
     
     return f'''/**
  * FluidKit Runtime Utilities
- * Auto-generated TypeScript utilities for FluidKit fetch wrappers
+ * Auto-generated TypeScript utilities for FluidKit client wrappers
  */
 
 export interface ApiResult<T = any> {{
@@ -222,6 +252,8 @@ export interface ApiResult<T = any> {{
   status: number;
   success: boolean;
 }}
+
+{common_types_exports}
 
 {base_url_fn}
 
@@ -250,7 +282,122 @@ export async function handleResponse<T = any>(response: Response): Promise<ApiRe
       success: false 
     }};
   }}
-}}'''
+}}
+
+'''
+
+
+def _generate_common_types_exports() -> str:
+    return '''// === COMMON EXTERNAL TYPES === //
+
+export namespace FluidTypes {
+  /**
+   * UUID string type
+   * @external Python uuid.UUID -> string
+   */
+  export type UUID = string;
+
+  /**
+   * Decimal number type  
+   * @external Python decimal.Decimal -> number
+   */
+  export type Decimal = number;
+
+  /**
+   * DateTime string type (ISO format)
+   * @external Python datetime.datetime -> string
+   */
+  export type DateTime = string;
+
+  /**
+   * Date string type (ISO format)
+   * @external Python datetime.date -> string  
+   */
+  export type Date = string;
+
+  /**
+   * File path string type
+   * @external Python pathlib.Path -> string
+   */
+  export type Path = string;
+
+  /**
+   * Email string type
+   * @external Pydantic EmailStr -> string
+   */
+  export type EmailStr = string;
+
+  /**
+   * HTTP URL string type
+   * @external Pydantic HttpUrl -> string
+   */
+  export type HttpUrl = string;
+
+  /**
+   * Payment card number string type
+   * @external pydantic_extra_types.PaymentCardNumber -> string
+   */
+  export type PaymentCardNumber = string;
+}
+
+'''
+
+
+def _generate_streaming_runtime() -> str:
+    """Generate streaming-specific runtime utilities."""
+    
+    return '''
+// === STREAMING TYPES AND UTILITIES === //
+
+/**
+ * Callbacks for Server-Sent Events (SSE) endpoints
+ */
+export interface SSECallbacks {
+  onMessage?: (event: MessageEvent) => void;
+  onError?: (event: Event) => void;
+  onOpen?: (event: Event) => void;
+  onClose?: () => void;
+}
+
+/**
+ * SSE connection control interface
+ */
+export interface SSEConnection {
+  close(): void;
+  readyState: number;
+  url: string;
+  addEventListener(type: string, listener: EventListener): void;
+  removeEventListener(type: string, listener: EventListener): void;
+}
+
+/**
+ * Extended options for SSE connections
+ */
+export interface SSERequestInit extends EventSourceInit {
+  headers?: Record<string, string>;
+  timeout?: number;
+  reconnectAttempts?: number;
+  reconnectDelay?: number;
+}
+
+/**
+ * Callbacks for JSON/data streaming endpoints
+ */
+export interface StreamingCallbacks<T> {
+  onChunk?: (chunk: T) => void;
+  onError?: (error: Error) => void;
+  onComplete?: () => void;
+}
+
+/**
+ * Callbacks for text streaming endpoints
+ */
+export interface TextStreamCallbacks {
+  onChunk?: (text: string) => void;
+  onError?: (error: Error) => void;
+  onComplete?: () => void;
+}
+'''
 
 
 def _generate_framework_aware_base_url(config: FluidKitConfig) -> str:
@@ -393,7 +540,7 @@ export const HEAD: RequestHandler = proxyRequest;
 
 def _generate_nextjs_proxy(env_config, project_root: str, config: FluidKitConfig) -> Dict[str, str]:
     """Generate Next.js API proxy route."""
-    # TODO: Implement proying for Next.js
+    # TODO: Implement Next.js proxy generation
     pass
 
 
@@ -460,7 +607,8 @@ def _create_generation_manifest(
         "lastGenerated": datetime.now().isoformat(),
         "sourceToGenerated": source_to_generated,
         "generatedFiles": list(generated_files.keys()),
-        "autoDiscoveredFiles": auto_discovered
+        "autoDiscoveredFiles": auto_discovered,
+        "hasStreamingRoutes": any(route.is_streaming for route in fluid_app.routes)
     }
 
 
@@ -472,7 +620,7 @@ def test_config_driven_generation():
         from tests.sample.app import app
         from fluidkit.core.integrator import integrate
         
-        print("=== TESTING CONFIG-DRIVEN GENERATION ===")
+        print("=== TESTING CONFIG-DRIVEN GENERATION WITH STREAMING ===")
         
         # Test normal flow
         print("\n1. Testing normal flow generation:")
@@ -487,13 +635,21 @@ def test_config_driven_generation():
         if runtime_files:
             print("\n2. Runtime content preview:")
             runtime_content = files[runtime_files[0]]
+            
+            # Check for streaming support
+            has_sse_types = 'SSECallbacks' in runtime_content
+            has_streaming_types = 'StreamingCallbacks' in runtime_content
+            
+            print(f"   Has SSE types: {has_sse_types}")
+            print(f"   Has streaming types: {has_streaming_types}")
+            
             lines = runtime_content.split('\n')
-            for i, line in enumerate(lines[:15]):
+            for i, line in enumerate(lines[:20]):
                 print(f"   {i+1:2d}: {line}")
-            if len(lines) > 15:
-                print(f"       ... ({len(lines)-15} more lines)")
+            if len(lines) > 20:
+                print(f"       ... ({len(lines)-20} more lines)")
         
-        print("\nConfig-driven generation test passed!")
+        print("\nConfig-driven generation with streaming support test passed!")
         
     except ImportError:
         print("Could not import test app")

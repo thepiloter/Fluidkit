@@ -29,4 +29,3 @@ class GenerationPaths:
     # Future language runtimes
     PYTHON_RUNTIME = "runtime.py"
     JAVASCRIPT_RUNTIME = "runtime.js"
-

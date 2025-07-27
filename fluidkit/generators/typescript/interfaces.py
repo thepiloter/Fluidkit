@@ -6,6 +6,7 @@ type alias support, and security-aware documentation.
 """
 
 from typing import List
+
 from fluidkit.core.schema import ModelNode, Field, FieldConstraints, ContainerType, BaseType
 
 
@@ -175,6 +176,10 @@ def _convert_annotation_to_typescript(annotation, is_top_level: bool = False) ->
     if annotation.container:
         return _convert_container_type(annotation, is_top_level)
     elif annotation.custom_type:
+        # Check for common external types first
+        if annotation.is_common_external:
+            return annotation.custom_type
+
         # External types become 'any', project types keep their name
         if annotation.class_reference:
             from fluidkit.core.utils import classify_module
@@ -186,7 +191,6 @@ def _convert_annotation_to_typescript(annotation, is_top_level: bool = False) ->
         return _convert_base_type(annotation.base_type)
     else:
         return "any"
-
 
 def _convert_base_type(base_type) -> str:
     """Convert base types to TypeScript."""

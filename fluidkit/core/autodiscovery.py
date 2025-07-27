@@ -5,15 +5,15 @@ Discovers files matching multiple patterns and automatically binds their APIRout
 Supports SvelteKit-style folder structures with parameter validation.
 """
 
-import sys
 import re
+import sys
 import inspect
 import importlib.util
 from pathlib import Path
 from fnmatch import fnmatch
-from typing import List, Tuple, Dict, Any, Set, Optional
-from fastapi import FastAPI, APIRouter
 from fastapi.routing import APIRoute
+from fastapi import FastAPI, APIRouter
+from typing import List, Tuple, Dict, Any, Set, Optional
 
 from fluidkit.core.config import FluidKitConfig
 
@@ -66,14 +66,7 @@ def auto_discover_and_bind_routes(app: FastAPI, config: FluidKitConfig, project_
                     
                     # Calculate final prefix and bind to app
                     final_prefix = _combine_prefixes(auto_prefix, getattr(router_instance, 'prefix', ''))
-                    if final_prefix and final_prefix != router_instance.prefix:
-                        # Create new router with combined prefix
-                        new_router = APIRouter(prefix=final_prefix)
-                        for route in router_instance.routes:
-                            new_router.routes.append(route)
-                        app.include_router(new_router)
-                    else:
-                        app.include_router(router_instance)
+                    app.include_router(router_instance, prefix=final_prefix)
                     
                     discovery_results.append({
                         "file": str(file_path),

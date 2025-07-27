@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, Literal, List
 
 
-__version__ = "0.2.3"
+__version__ = "0.2.4"
 
 def get_version() -> str:
     return __version__
@@ -98,6 +98,61 @@ class FluidKitConfig:
     def get_runtime_location(self, project_root: str) -> str:
         """Get absolute path for runtime.ts location."""
         return str(Path(project_root) / self.output.location / "runtime.ts")
+
+
+def ensure_config_for_mode(enable_fullstack: bool, project_root: str) -> FluidKitConfig:
+    config_path = Path(project_root) / "fluid.config.json"
+    
+    if config_path.exists():
+        existing_config = _load_config_from_file(config_path)
+        if enable_fullstack and not existing_config.framework:
+            upgraded = _upgrade_to_fullstack(existing_config)
+            _save_config_to_file(upgraded, config_path)
+            return upgraded
+        return existing_config
+    else:
+        template = _get_config_template(enable_fullstack)
+        new_config = _validate_and_convert_config(template)
+        _save_config_to_file(new_config, config_path)
+        return new_config
+    
+
+def _get_config_template(enable_fullstack: bool) -> dict:
+    if enable_fullstack:
+        return {
+            "framework": "sveltekit",
+            "target": "development", 
+            "output": {"location": ".fluidkit"},
+            "backend": {"host": "localhost", "port": 8000},
+            "environments": {
+                "development": {"mode": "unified", "apiUrl": "/proxy"},
+                "production": {"mode": "unified", "apiUrl": "/proxy"}
+            },
+            "autoDiscovery": {"enabled": True, "filePatterns": ["_*.py", "*.*.py"]},
+            "include": ["src/**/*.py"], 
+            "exclude": ["**/__pycache__/**", "**/*.test.py"]
+        }
+    else:
+        return {
+            "target": "development",
+            "output": {"location": ".fluidkit"},
+            "backend": {"host": "localhost", "port": 8000},
+            "environments": {
+                "development": {"apiUrl": "http://localhost:8000"},
+                "production": {"apiUrl": "https://backend.api.com"}
+            }
+        }
+    
+
+def _upgrade_to_fullstack(existing_config: FluidKitConfig) -> FluidKitConfig:
+    existing_dict = _config_to_dict(existing_config)
+    fullstack_template = _get_config_template(enable_fullstack=True)
+    
+    for key, value in fullstack_template.items():
+        if key not in existing_dict:
+            existing_dict[key] = value
+    
+    return _validate_and_convert_config(existing_dict)
 
 
 def load_fluidkit_config(project_root: Optional[str] = None) -> FluidKitConfig:
@@ -273,12 +328,6 @@ def _config_to_dict(config: FluidKitConfig) -> Dict[str, Any]:
     """Convert FluidKitConfig to dictionary for JSON serialization."""
     config_dict = {
         "target": config.target,
-        "include": config.include,
-        "exclude": config.exclude,
-        "autoDiscovery": {
-            "enabled": config.autoDiscovery.enabled,
-            "filePatterns": config.autoDiscovery.filePatterns
-        },
         "output": {
             "strategy": config.output.strategy,
             "location": config.output.location
@@ -293,6 +342,15 @@ def _config_to_dict(config: FluidKitConfig) -> Dict[str, Any]:
     # Add framework if present (full-stack config)
     if config.framework:
         config_dict["framework"] = config.framework
+    
+    # Only add auto-discovery related fields if auto-discovery is enabled
+    if config.autoDiscovery.enabled:
+        config_dict["include"] = config.include
+        config_dict["exclude"] = config.exclude
+        config_dict["autoDiscovery"] = {
+            "enabled": config.autoDiscovery.enabled,
+            "filePatterns": config.autoDiscovery.filePatterns
+        }
     
     # Add environments
     for env_name, env_config in config.environments.items():

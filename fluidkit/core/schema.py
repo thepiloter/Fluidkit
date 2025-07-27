@@ -70,6 +70,20 @@ class LanguageType(Enum):
     # GO = "go"
 
 
+class StreamingClientType(Enum):
+    """
+    Types of streaming clients to generate - based on client code patterns.
+    
+    Represents different TypeScript client generation strategies for streaming endpoints,
+    focusing on the client API pattern rather than HTTP implementation details.
+    """
+    
+    EVENT_SOURCE = "event_source"        # Uses EventSource API for Server-Sent Events
+    READABLE_STREAM = "readable_stream"  # Uses fetch + ReadableStream for JSON/data streaming
+    FILE_DOWNLOAD = "file_download"      # Uses fetch + blob/arrayBuffer for file downloads  
+    TEXT_STREAM = "text_stream"          # Uses fetch + TextDecoder for text streaming
+
+
 # === ANNOTATIONS === #
 
 @dataclass
@@ -91,7 +105,8 @@ class FieldAnnotation:
     literal_values: List[str] = None                   # Values for Literal types
     custom_type: Optional[str] = None                  # Custom class/enum names
     class_reference: Optional[Any] = None              # Reference to custom class/enum
-    
+    is_common_external: bool = False
+
     def __post_init__(self):
         """Initialize default empty lists for mutable fields."""
         if self.args is None:
@@ -386,7 +401,8 @@ class RouteNode:
     FastAPI route discovered through runtime introspection.
     
     Represents a FastAPI route function that should be converted to TypeScript
-    fetch client function. Populated from FastAPI route introspection.
+    client function. Populated from FastAPI route introspection with support
+    for both regular REST endpoints and streaming endpoints.
     """
     name: str                                       # Function name
     methods: List[str]                              # HTTP methods ["GET", "POST"] or ["GET"]
@@ -397,6 +413,37 @@ class RouteNode:
     docstring: Optional[str] = None                 # Function docstring
     security_requirements: List[SecurityRequirement] = field(default_factory=list)
     
+    # STREAMING SUPPORT
+    streaming_client_type: Optional[StreamingClientType] = None       # Type of streaming client to generate
+    streaming_media_type: Optional[str] = None                        # Raw MIME type for metadata/JSDoc
+    streaming_metadata: Dict[str, Any] = field(default_factory=dict)  # Extensible streaming-specific metadata
+
+    # DERIVED PROPERTIES
+    @property
+    def is_streaming(self) -> bool:
+        """Whether this endpoint streams any type of content."""
+        return self.streaming_client_type is not None
+    
+    @property  
+    def is_sse(self) -> bool:
+        """Whether this endpoint streams Server-Sent Events."""
+        return self.streaming_client_type == StreamingClientType.EVENT_SOURCE
+    
+    @property
+    def is_readable_stream(self) -> bool:
+        """Whether this endpoint uses ReadableStream pattern."""
+        return self.streaming_client_type == StreamingClientType.READABLE_STREAM
+    
+    @property
+    def is_file_download(self) -> bool:
+        """Whether this endpoint streams file downloads."""
+        return self.streaming_client_type == StreamingClientType.FILE_DOWNLOAD
+
+    @property
+    def is_text_stream(self) -> bool:
+        """Whether this endpoint streams text content."""
+        return self.streaming_client_type == StreamingClientType.TEXT_STREAM
+
     @property
     def is_single_method(self) -> bool:
         return len(self.methods) == 1
@@ -579,32 +626,6 @@ class FluidKitApp:
                     imports_by_path[import_path].append(type_name)
         
         return imports_by_path
-
-
-# === COMPATIBILITY HELPERS === #
-def _calculate_cross_platform_relative_path(target_path: Path, source_dir: Path) -> Optional[Path]:
-    """
-    Calculate relative path between two paths with cross-drive/mount handling.
-    
-    Args:
-        target_path: Target file path
-        source_dir: Source directory path
-        
-    Returns:
-        Relative Path object or None if cross-drive/mount issue
-    """
-    try:
-        # Try Path.relative_to first (most reliable when it works)
-        return target_path.relative_to(source_dir)
-    except ValueError:
-        # Path.relative_to failed - try os.path.relpath
-        try:
-            import os
-            rel_path_str = os.path.relpath(str(target_path), str(source_dir))
-            return Path(rel_path_str)
-        except (ValueError, OSError):
-            # Both methods failed - likely cross-drive on Windows
-            return None
 
 
 def create_fluidkit_app_from_compilation_units(compilation_units: Dict[str, Any]) -> FluidKitApp:
