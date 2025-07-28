@@ -28,6 +28,84 @@ import fluidkit
 fluidkit.integrate(app, enable_fullstack=True)  # Complete fullstack tooling
 ```
 
+## 🚀 Full-Stack Get Started
+
+**Prerequisites:** Node.js, [uv](https://docs.astral.sh/uv/) (preferred) or Poetry
+
+```bash
+# 1. Create SvelteKit project
+npx sv create my-app
+cd my-app
+
+# 2. Initialize Python environment
+uv init  # or: poetry init
+uv add fluidkit  # or: poetry add fluidkit
+
+# 3. Create Python backend
+```
+
+**Folder structure:**
+```
+src/routes/
+├── +page.svelte  # Svelte component
+├── app.api.py    # Python API logic  
+└── app.api.ts    # Auto-generated client (by FluidKit)
+```
+
+**Create `src/app.py`:**
+```python
+import fluidkit
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+fluidkit.integrate(app, enable_fullstack=True)
+
+if __name__ == "__main__":
+  import uvicorn
+  uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+```
+
+**Create `src/routes/hello.api.py`:**
+```python
+from fastapi import APIRouter
+from pydantic import BaseModel
+
+router = APIRouter()
+
+class Message(BaseModel):
+    text: str
+
+@router.get("/hello")
+async def get_message() -> Message:
+    return Message(text="Hello from Python!")
+```
+
+**Use in `src/routes/+page.svelte`:**
+```svelte
+<script>
+  import { get_message } from './hello.api';
+  
+  let message = $state('');
+  
+  get_message().then(result => {
+    if (result.success) message = result.data.text;
+  });
+</script>
+
+<h1>{message}</h1>
+```
+
+```bash
+# 4. Start development
+uv run python src/app.py  # Start Python backend
+npm run dev  # Start SvelteKit (separate terminal)
+```
+
+**You're ready!** Visit `http://localhost:5173` to see your full-stack app. Visit `http://localhost:5173/proxy/docs` to see fastapi swagger UI.
+
+
 ## The FluidKit Experience
 
 **Write your backend in Python:**
@@ -102,7 +180,7 @@ export const get_user = async (user_id: FluidTypes.UUID): Promise<ApiResult<User
 };
 ```
 
-## ✨ What's New in v0.2.4
+## ✨ What's New in v0.2.6
 
 - 🔄 **[Streaming Support](docs/streaming.md)** - Server-Sent Events, file downloads, JSON streaming
 - 🏷️ **[FluidTypes Namespace](docs/types.md)** - Clean handling of external types (UUID, Decimal, DateTime)
@@ -165,23 +243,5 @@ fluidkit.integrate(app, enable_fullstack=True)
 - 🚧 **Python Client Generation** - Full Python ecosystem
 - 🚧 **Advanced Streaming** - WebSockets, real-time features
 
-## Quick Start
-
-```python
-# 1. Install FluidKit
-pip install fluidkit
-
-# 2. Add to your FastAPI app
-import fluidkit
-fluidkit.integrate(app, enable_fullstack=True)
-
-# 3. Start developing
-# - Your Python API functions become importable in SvelteKit as co-located ts files will be created with client code
-# - Full type safety throughout
-# - Environment-aware proxying handles SSR/CSR automatically
-# - Access entire JavaScript ecosystem for UI
-```
-
----
 
 **Build modern, type-safe web applications using the Python ecosystem you know + the SvelteKit performance you want.**

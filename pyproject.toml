@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fluidkit"
-version = "0.2.5"
+version = "0.2.6"
 description = "Automatic TypeScript client generation for FastAPI through runtime introspection"
 readme = "README.md"
 requires-python = ">=3.10"

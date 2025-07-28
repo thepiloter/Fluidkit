@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, Literal, List
 
 
-__version__ = "0.2.5"
+__version__ = "0.2.6"
 
 def get_version() -> str:
     return __version__
@@ -122,7 +122,10 @@ def _get_config_template(enable_fullstack: bool) -> dict:
         return {
             "framework": "sveltekit",
             "target": "development", 
-            "output": {"location": ".fluidkit"},
+            "output": {
+                "strategy": "co-locate",
+                "location": "src/lib/.fluidkit"
+            },
             "backend": {"host": "localhost", "port": 8000},
             "environments": {
                 "development": {"mode": "unified", "apiUrl": "/proxy"},
