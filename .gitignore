@@ -209,14 +209,8 @@ __marimo__/
 
 
 # Custom ignore
-tests/app.ts
-tests/schema.ts
 .fluidkit/
 fluid.config.json
-*.ts
-app.ts
-orders.ts
-users.ts
 my-test-app
 src/
 sse.md
