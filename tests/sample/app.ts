@@ -3,8 +3,8 @@
  * Changes will be overwritten on regeneration.
  */
 
-import type { ApiResult } from '../../src/lib/.fluidkit/runtime';
-import { getBaseUrl, handleResponse } from '../../src/lib/.fluidkit/runtime';
+import type { ApiResult } from './.fluidkit/runtime';
+import { getBaseUrl, handleResponse } from './.fluidkit/runtime';
 
 /**
  * GET /

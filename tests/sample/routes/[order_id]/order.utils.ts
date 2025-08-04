@@ -3,9 +3,9 @@
  * Changes will be overwritten on regeneration.
  */
 
-import type { ApiResult, FluidTypes } from '../../../.fluidkit/runtime';
-import { getBaseUrl, handleResponse } from '../../../.fluidkit/runtime';
-import type { OrderResponse } from '../models/orders';
+import type { ApiResult, FluidTypes } from '../../.fluidkit/runtime';
+import { getBaseUrl, handleResponse } from '../../.fluidkit/runtime';
+import type { OrderResponse } from '../../models/orders';
 
 /**
  * Get order by ID with optional details
@@ -15,7 +15,7 @@ import type { OrderResponse } from '../models/orders';
  * @param include_payment_details
  */
 export const get_order = async (order_id: FluidTypes.UUID, include_customer_details?: boolean, include_payment_details?: boolean, options?: RequestInit): Promise<ApiResult<OrderResponse>> => {
-  let url = `${getBaseUrl()}/tests/sample/${order_id}/`;
+  let url = `${getBaseUrl()}/${order_id}/`;
 
   const searchParams = new URLSearchParams();
   if (include_customer_details !== undefined) {
@@ -45,7 +45,7 @@ export const get_order = async (order_id: FluidTypes.UUID, include_customer_deta
  * @param detailed
  */
 export const get_order_tracking = async (order_id: FluidTypes.UUID, detailed?: boolean, options?: RequestInit): Promise<ApiResult<Record<string, any>>> => {
-  let url = `${getBaseUrl()}/tests/sample/${order_id}/tracking`;
+  let url = `${getBaseUrl()}/${order_id}/tracking`;
 
   const searchParams = new URLSearchParams();
   if (detailed !== undefined) {

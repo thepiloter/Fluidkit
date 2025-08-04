@@ -56,7 +56,7 @@ def auto_discover_and_bind_routes(app: FastAPI, config: FluidKitConfig, project_
             
             # Extract path parameters from file structure
             path_parameters = _extract_path_parameters(file_path, project_path)
-            auto_prefix = _calculate_auto_prefix(file_path, project_path)
+            auto_prefix = _calculate_auto_prefix(file_path, project_path, config)
             
             # Validate and bind each router
             for router_var_name, router_instance in routers:
@@ -303,15 +303,33 @@ def _extract_path_parameters(file_path: Path, project_path: Path) -> Set[str]:
     return parameters
 
 
-def _calculate_auto_prefix(file_path: Path, project_path: Path) -> str:
+def _calculate_auto_prefix(file_path: Path, project_path: Path, config: Optional[FluidKitConfig] = None) -> str:
     """Calculate auto-generated prefix from folder structure."""
     try:
         relative_path = file_path.relative_to(project_path)
     except ValueError:
         return ""
     
+    path_parts = list(relative_path.parts[:-1])  # Exclude filename
+    
+    # For fullstack mode, use routes/ as base directory
+    if config and config.is_fullstack_config:
+        try:
+            routes_index = path_parts.index("routes")
+            # Use only parts after "routes"
+            path_parts = path_parts[routes_index + 1:]
+        except ValueError:
+            # "routes" directory not found in fullstack mode
+            readable_path = str(relative_path)
+            raise ValueError(
+                f"Auto-discovery in fullstack mode requires a 'routes/' directory. "
+                f"File {readable_path} is not within a routes/ folder structure. "
+                f"Expected structure: routes/your/api/files.py"
+            )
+    
+    # Build prefix parts
     prefix_parts = []
-    for part in relative_path.parts[:-1]:  # Exclude filename
+    for part in path_parts:
         if part.startswith('(') and part.endswith(')'):
             # Skip route groups - they don't affect URL
             continue

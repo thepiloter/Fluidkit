@@ -3,9 +3,9 @@
  * Changes will be overwritten on regeneration.
  */
 
-import type { ApiResult, FluidTypes, SSECallbacks, SSEConnection, SSERequestInit, StreamingCallbacks } from '../../.fluidkit/runtime';
-import { getBaseUrl, handleResponse } from '../../.fluidkit/runtime';
-import type { CreateOrderRequest, OrderListResponse, OrderResponse, OrderStatus, ShippingMethod } from './models/orders';
+import type { ApiResult, FluidTypes, SSECallbacks, SSEConnection, SSERequestInit, StreamingCallbacks } from '../.fluidkit/runtime';
+import { getBaseUrl, handleResponse } from '../.fluidkit/runtime';
+import type { CreateOrderRequest, OrderListResponse, OrderResponse, OrderStatus, ShippingMethod } from '../models/orders';
 
 /**
  * List orders with filtering
@@ -16,7 +16,7 @@ import type { CreateOrderRequest, OrderListResponse, OrderResponse, OrderStatus,
  * @param customer_id
  */
 export const list_orders = async (page?: number, per_page?: number, status?: OrderStatus, customer_id?: FluidTypes.UUID, options?: RequestInit): Promise<ApiResult<OrderListResponse>> => {
-  let url = `${getBaseUrl()}/tests/sample/orders/orders/`;
+  let url = `${getBaseUrl()}/orders/orders/`;
 
   const searchParams = new URLSearchParams();
   if (page !== undefined) {
@@ -53,7 +53,7 @@ export const list_orders = async (page?: number, per_page?: number, status?: Ord
  * @param send_confirmation_email
  */
 export const create_order = async (order_data: CreateOrderRequest, auto_confirm?: boolean, send_confirmation_email?: boolean, options?: RequestInit): Promise<ApiResult<OrderResponse>> => {
-  let url = `${getBaseUrl()}/tests/sample/orders/orders/`;
+  let url = `${getBaseUrl()}/orders/orders/`;
 
   const searchParams = new URLSearchParams();
   if (auto_confirm !== undefined) {
@@ -89,7 +89,7 @@ export const create_order = async (order_data: CreateOrderRequest, auto_confirm?
  * @param notify_customer
  */
 export const update_order = async (order_id: FluidTypes.UUID, status?: OrderStatus, shipping_method?: ShippingMethod, notify_customer?: boolean, options?: RequestInit): Promise<ApiResult<OrderResponse>> => {
-  let url = `${getBaseUrl()}/tests/sample/orders/orders/${order_id}`;
+  let url = `${getBaseUrl()}/orders/orders/${order_id}`;
 
   const searchParams = new URLSearchParams();
   if (status !== undefined) {
@@ -124,7 +124,7 @@ export const update_order = async (order_id: FluidTypes.UUID, status?: OrderStat
  * @param notify_customer
  */
 export const cancel_order = async (order_id: FluidTypes.UUID, reason: string, refund_amount?: number, notify_customer?: boolean, options?: RequestInit): Promise<ApiResult<OrderResponse>> => {
-  let url = `${getBaseUrl()}/tests/sample/orders/orders/${order_id}/cancel`;
+  let url = `${getBaseUrl()}/orders/orders/${order_id}/cancel`;
 
   const searchParams = new URLSearchParams();
   searchParams.set('reason', String(reason));
@@ -158,7 +158,7 @@ export const cancel_order = async (order_id: FluidTypes.UUID, reason: string, re
  * **Stream Type:** text/event-stream
  */
 export const stream_order_updates = (order_id: FluidTypes.UUID, callbacks: SSECallbacks, options?: SSERequestInit): SSEConnection => {
-  let url = `${getBaseUrl()}/tests/sample/orders/orders/${order_id}/updates`;
+  let url = `${getBaseUrl()}/orders/orders/${order_id}/updates`;
 
   const eventSource = new EventSource(url, {
     withCredentials: options?.withCredentials,
@@ -198,7 +198,7 @@ export const stream_order_updates = (order_id: FluidTypes.UUID, callbacks: SSECa
  * **Stream Type:** application/x-ndjson
  */
 export const stream_order_reports = async (callbacks: StreamingCallbacks<any>, options?: RequestInit): Promise<void> => {
-  let url = `${getBaseUrl()}/tests/sample/orders/orders/reports/stream`;
+  let url = `${getBaseUrl()}/orders/orders/reports/stream`;
 
   const requestOptions: RequestInit = {
     method: 'GET',

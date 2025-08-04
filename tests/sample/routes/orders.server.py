@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, status
 from sse_starlette import EventSourceResponse
 from starlette.responses import StreamingResponse
 
-from .models.orders import (
+from ..models.orders import (
     Order, OrderResponse, OrderListResponse, CreateOrderRequest,
     OrderStatus, ShippingMethod
 )

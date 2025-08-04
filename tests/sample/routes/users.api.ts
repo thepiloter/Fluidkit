@@ -3,9 +3,9 @@
  * Changes will be overwritten on regeneration.
  */
 
-import type { ApiResult, FluidTypes, SSECallbacks, SSEConnection, SSERequestInit, StreamingCallbacks, TextStreamCallbacks } from '../../.fluidkit/runtime';
-import { getBaseUrl, handleResponse } from '../../.fluidkit/runtime';
-import type { CreateUserRequest, UserListResponse, UserResponse, UserRole, UserStatus } from './models/users';
+import type { ApiResult, FluidTypes, SSECallbacks, SSEConnection, SSERequestInit, StreamingCallbacks, TextStreamCallbacks } from '../.fluidkit/runtime';
+import { getBaseUrl, handleResponse } from '../.fluidkit/runtime';
+import type { CreateUserRequest, UserListResponse, UserResponse, UserRole, UserStatus } from '../models/users';
 
 /**
  * List users with filtering and pagination
@@ -17,7 +17,7 @@ import type { CreateUserRequest, UserListResponse, UserResponse, UserRole, UserS
  * @param search
  */
 export const list_users = async (page?: number, per_page?: number, role?: UserRole, status?: UserStatus, search?: string, options?: RequestInit): Promise<ApiResult<UserListResponse>> => {
-  let url = `${getBaseUrl()}/tests/sample/users/users/`;
+  let url = `${getBaseUrl()}/users/users/`;
 
   const searchParams = new URLSearchParams();
   if (page !== undefined) {
@@ -56,7 +56,7 @@ export const list_users = async (page?: number, per_page?: number, role?: UserRo
  * @param include_balance
  */
 export const get_user = async (user_id: FluidTypes.UUID, include_balance?: boolean, options?: RequestInit): Promise<ApiResult<UserResponse>> => {
-  let url = `${getBaseUrl()}/tests/sample/users/users/${user_id}`;
+  let url = `${getBaseUrl()}/users/users/${user_id}`;
 
   const searchParams = new URLSearchParams();
   if (include_balance !== undefined) {
@@ -83,7 +83,7 @@ export const get_user = async (user_id: FluidTypes.UUID, include_balance?: boole
  * @param send_welcome_email
  */
 export const create_user = async (user_data: CreateUserRequest, send_welcome_email?: boolean, options?: RequestInit): Promise<ApiResult<UserResponse>> => {
-  let url = `${getBaseUrl()}/tests/sample/users/users/`;
+  let url = `${getBaseUrl()}/users/users/`;
 
   const searchParams = new URLSearchParams();
   if (send_welcome_email !== undefined) {
@@ -117,7 +117,7 @@ export const create_user = async (user_data: CreateUserRequest, send_welcome_ema
  * @param send_notification
  */
 export const update_user = async (user_id: FluidTypes.UUID, username?: string, email?: string, role?: UserRole, send_notification?: boolean, options?: RequestInit): Promise<ApiResult<UserResponse>> => {
-  let url = `${getBaseUrl()}/tests/sample/users/users/${user_id}`;
+  let url = `${getBaseUrl()}/users/users/${user_id}`;
 
   const searchParams = new URLSearchParams();
   if (username !== undefined) {
@@ -153,7 +153,7 @@ export const update_user = async (user_id: FluidTypes.UUID, username?: string, e
  * @param hard_delete
  */
 export const delete_user = async (user_id: FluidTypes.UUID, hard_delete?: boolean, options?: RequestInit): Promise<ApiResult<null>> => {
-  let url = `${getBaseUrl()}/tests/sample/users/users/${user_id}`;
+  let url = `${getBaseUrl()}/users/users/${user_id}`;
 
   const searchParams = new URLSearchParams();
   if (hard_delete !== undefined) {
@@ -183,7 +183,7 @@ export const delete_user = async (user_id: FluidTypes.UUID, hard_delete?: boolea
  * **Stream Type:** text/event-stream
  */
 export const stream_user_events = (user_id: FluidTypes.UUID, callbacks: SSECallbacks, options?: SSERequestInit): SSEConnection => {
-  let url = `${getBaseUrl()}/tests/sample/users/users/${user_id}/events`;
+  let url = `${getBaseUrl()}/users/users/${user_id}/events`;
 
   const eventSource = new EventSource(url, {
     withCredentials: options?.withCredentials,
@@ -223,7 +223,7 @@ export const stream_user_events = (user_id: FluidTypes.UUID, callbacks: SSECallb
  * **Stream Type:** application/x-ndjson
  */
 export const stream_user_analytics = async (callbacks: StreamingCallbacks<any>, options?: RequestInit): Promise<void> => {
-  let url = `${getBaseUrl()}/tests/sample/users/users/analytics/stream`;
+  let url = `${getBaseUrl()}/users/users/analytics/stream`;
 
   const requestOptions: RequestInit = {
     method: 'GET',
@@ -274,7 +274,7 @@ export const stream_user_analytics = async (callbacks: StreamingCallbacks<any>, 
  * **Stream Type:** text/csv
  */
 export const export_users_csv = async (callbacks: TextStreamCallbacks, options?: RequestInit): Promise<void> => {
-  let url = `${getBaseUrl()}/tests/sample/users/users/export/csv`;
+  let url = `${getBaseUrl()}/users/users/export/csv`;
 
   const requestOptions: RequestInit = {
     method: 'GET',

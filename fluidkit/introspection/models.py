@@ -55,11 +55,19 @@ def _discover_from_field_annotation(annotation: FieldAnnotation, discovered: Dic
     """
     if annotation.class_reference and annotation.custom_type:
         model_name = annotation.custom_type
-        
-        if model_name in discovered:
-            return
-        
         cls = annotation.class_reference
+        
+        # Check for name collision before adding
+        if model_name in discovered:
+            existing_model = discovered[model_name]
+            # Same class reference = no collision, just skip
+            if existing_model.location.module_path == cls.__module__:
+                return
+            
+            # Different modules with same name = collision
+            _raise_import_collision_error(model_name, existing_model, cls)
+        
+        # No collision - proceed with normal discovery
         module_name = cls.__module__
         
         from fluidkit.core.utils import classify_module
@@ -73,11 +81,40 @@ def _discover_from_field_annotation(annotation: FieldAnnotation, discovered: Dic
         if model_node:
             discovered[model_name] = model_node
             
+            # Recursively discover from this model's fields
             for field in model_node.fields:
                 _discover_from_field_annotation(field.annotation, discovered, project_path)
     
+    # Recursively check nested annotations
     for arg in annotation.args:
         _discover_from_field_annotation(arg, discovered, project_path)
+
+
+def _raise_import_collision_error(model_name: str, existing_model: ModelNode, new_class: type):
+    """Raise descriptive error for import name collisions."""
+    
+    error_lines = [
+        f"FluidKit detected a model name collision for '{model_name}':",
+        "",
+        "The same model name is used by classes from different modules:",
+        f"  1. {existing_model.location.module_path} ({existing_model.location.file_path})",
+        f"  2. {new_class.__module__} ({getattr(new_class, '__file__', 'unknown')})",
+        "",
+        "This collision occurs because both classes resolve to the same TypeScript interface name.",
+        "Import aliases don't solve this since FluidKit resolves aliases to original class names.",
+        "",
+        "Solutions:",
+        "1. Rename one of the conflicting classes:",
+        f"   class {model_name} -> class Core{model_name}  (in one of the modules)",
+        "",
+        "2. Avoid importing both classes in files that FluidKit processes:",
+        "   - Don't use both models in the same route file or related model files",
+        "   - Restructure to use only one of the models",
+        "",
+        "3. Reorganize your model structure to avoid name conflicts"
+    ]
+    
+    raise ValueError("\n".join(error_lines))
 
 
 def _introspect_class_to_model_node(cls: type) -> Optional[ModelNode]:

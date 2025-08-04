@@ -3,7 +3,7 @@
  * Changes will be overwritten on regeneration.
  */
 
-import type { FluidTypes } from '../../../.fluidkit/runtime';
+import type { FluidTypes } from '../.fluidkit/runtime';
 
 export interface User {
   /** @external uuid.UUID */
