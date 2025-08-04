@@ -491,16 +491,23 @@ async function proxyRequest(event: RequestEvent): Promise<Response> {{
     
     try {{
         // Forward request exactly as received
-        const response = await fetch(backendUrl, {{
+        const fetchOptions: RequestInit = {{
             method: request.method,
             headers,
-            body: request.body,      // Preserves FormData, JSON, binary, streams
-            signal: request.signal   // Preserves cancellation
-        }});
+            body: request.body,
+            signal: request.signal
+        }};
+
+        // Only add duplex if we are in Node ≥18 and the body is a stream
+        if (request.body && typeof ReadableStream !== 'undefined' && request.body instanceof ReadableStream) {{
+            (fetchOptions as any).duplex = 'half';
+        }}
+
+        const response = await fetch(backendUrl, fetchOptions);
         
         // Optional development logging
         if (import.meta.env.DEV) {{
-            console.log(`🔄 ${{request.method}} /{api_path}/${{path}} → ${{response.status}} ${{response.statusText}}`);
+            console.log(`Fluidkit Proxy: ${{request.method}} /{api_path}/${{path}} → ${{response.status}} ${{response.statusText}}`);
         }}
         
         // Return response exactly as received from FastAPI

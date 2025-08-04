@@ -182,7 +182,7 @@ export const get_user = async (user_id: FluidTypes.UUID): Promise<ApiResult<User
 };
 ```
 
-## ✨ What's New in v0.2.7
+## ✨ What's New in v0.2.8
 
 - 🔄 **[Streaming Support](docs/streaming.md)** - Server-Sent Events, file downloads, JSON streaming
 - 🏷️ **[FluidTypes Namespace](docs/types.md)** - Clean handling of external types (UUID, Decimal, DateTime)

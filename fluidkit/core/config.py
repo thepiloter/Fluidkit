@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, Literal, List
 
 
-__version__ = "0.2.7"
+__version__ = "0.2.8"
 
 def get_version() -> str:
     return __version__
