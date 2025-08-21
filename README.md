@@ -178,12 +178,13 @@ export interface User {
 }
 
 export const get_user = async (user_id: FluidTypes.UUID): Promise<ApiResult<User>> => {
-  // Environment-aware: direct FastAPI in SSR, proxied in browser
+  // Environment-aware: consistent proxy handling in both SSR and browser
 };
 ```
 
-## ✨ What's New in v0.2.8
+## ✨ What's New in v0.2.9
 
+- 🔧 **Enhanced Server-Side Proxying** - Improved authentication handling with consistent proxy routing
 - 🔄 **[Streaming Support](docs/streaming.md)** - Server-Sent Events, file downloads, JSON streaming
 - 🏷️ **[FluidTypes Namespace](docs/types.md)** - Clean handling of external types (UUID, Decimal, DateTime)
 - 📁 **[Enhanced Auto-Discovery](docs/auto-discovery.md)** - SvelteKit-style folder routing with parameter validation

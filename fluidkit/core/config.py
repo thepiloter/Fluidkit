@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, Optional, Literal, List
 
 
-__version__ = "0.2.8"
+__version__ = "0.2.9"
 
 def get_version() -> str:
     return __version__
@@ -38,6 +38,12 @@ class BackendConfig:
     port: int = 8000
     host: str = "localhost"
 
+@dataclass
+class FrontendConfig:
+    """Frontend server configuration."""
+    port: int = 5173
+    host: str = "localhost"
+
 
 @dataclass
 class EnvironmentConfig:
@@ -56,6 +62,7 @@ class FluidKitConfig:
     autoDiscovery: AutoDiscoveryConfig = field(default_factory=AutoDiscoveryConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     backend: BackendConfig = field(default_factory=BackendConfig)
+    frontend: FrontendConfig = field(default_factory=FrontendConfig)
     environments: Dict[str, EnvironmentConfig] = field(default_factory=dict)
     
     def __post_init__(self):
@@ -127,6 +134,7 @@ def _get_config_template(enable_fullstack: bool) -> dict:
                 "location": "src/lib/.fluidkit"
             },
             "backend": {"host": "localhost", "port": 8000},
+            "frontend": {"host": "localhost", "port": 5173},
             "environments": {
                 "development": {"mode": "unified", "apiUrl": "/proxy"},
                 "production": {"mode": "unified", "apiUrl": "/proxy"}
@@ -240,6 +248,12 @@ def _validate_and_convert_config(config_data: Dict[str, Any]) -> FluidKitConfig:
         port=backend_data.get("port", 8000),
         host=backend_data.get("host", "localhost")
     )
+
+    frontend_data = config_data.get("frontend", {})
+    frontend_config = FrontendConfig(
+        port=frontend_data.get("port", 5173),
+        host=frontend_data.get("host", "localhost")
+    )
     
     # Extract and validate environments
     environments_data = config_data.get("environments", {})
@@ -262,6 +276,7 @@ def _validate_and_convert_config(config_data: Dict[str, Any]) -> FluidKitConfig:
         exclude=exclude,
         output=output_config,
         backend=backend_config,
+        frontend=frontend_config,
         environments=environments,
         autoDiscovery=auto_discovery,
         framework=config_data.get("framework"),
@@ -338,6 +353,10 @@ def _config_to_dict(config: FluidKitConfig) -> Dict[str, Any]:
         "backend": {
             "port": config.backend.port,
             "host": config.backend.host
+        },
+        "frontend": {
+            "port": config.frontend.port,
+            "host": config.frontend.host
         },
         "environments": {}
     }

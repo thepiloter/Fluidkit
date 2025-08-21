@@ -23,6 +23,10 @@ fluidkit.integrate(app)
     "host": "localhost",
     "port": 8000
   },
+  "frontend": {
+    "host": "localhost",
+    "port": 5173
+  },
   "environments": {
     "development": {
       "mode": "separate",
@@ -57,6 +61,10 @@ fluidkit.integrate(app, enable_fullstack=True)
   "backend": {
     "host": "localhost",
     "port": 8000
+  },
+  "frontend": {
+    "host": "localhost",
+    "port": 5173
   },
   "environments": {
     "development": {
@@ -247,7 +255,9 @@ Useful for:
 - Testing different configurations
 - Environment-specific builds
 
-## Backend Configuration
+## Server Configuration
+
+### Backend Configuration
 
 ```json
 {
@@ -258,10 +268,22 @@ Useful for:
 }
 ```
 
+### Frontend Configuration
+
+```json
+{
+  "frontend": {
+    "host": "localhost", 
+    "port": 5173
+  }
+}
+```
+
 Used for:
-- Development proxy target
-- Auto-generated environment URLs
-- Local development coordination
+- **Backend**: FastAPI server location for proxy target and direct communication
+- **Frontend**: SvelteKit dev server location for unified mode server-side requests
+- **Auto-generated URLs**: Environment-aware runtime generation
+- **Local development**: Coordination between frontend and backend servers
 
 ## Best Practices
 

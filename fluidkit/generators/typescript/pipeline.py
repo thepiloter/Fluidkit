@@ -411,16 +411,20 @@ def _generate_framework_aware_base_url(config: FluidKitConfig) -> str:
     )
     
     if has_unified_mode:
-        # Framework flow with proxy detection
-        return f'''export function getBaseUrl(): string {{
-  // Detect if running in browser (client) vs server
+        # Check if apiUrl is relative (starts with /)
+        if target_env.apiUrl.startswith('/'):
+            # Unified mode with relative URL - use frontend config
+            return f'''export function getBaseUrl(): string {{
   if (typeof window !== 'undefined') {{
-    // Browser environment - use proxy routes
     return '{target_env.apiUrl}';
   }}
   
-  // Server environment - direct communication
-  return 'http://{config.backend.host}:{config.backend.port}';
+  return 'http://{config.frontend.host}:{config.frontend.port}{target_env.apiUrl}';
+}}'''
+        else:
+            # Unified mode with absolute URL - use as-is
+            return f'''export function getBaseUrl(): string {{
+  return '{target_env.apiUrl}';
 }}'''
     else:
         # Framework flow but all separate mode

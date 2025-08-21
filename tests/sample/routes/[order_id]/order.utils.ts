@@ -64,3 +64,61 @@ export const get_order_tracking = async (order_id: FluidTypes.UUID, detailed?: b
   const response = await fetch(url, requestOptions);
   return handleResponse(response);
 };
+
+/**
+ * Get order by ID with optional details
+ *
+ * @param order_id
+ * @param include_customer_details
+ * @param include_payment_details
+ */
+export const get_order = async (order_id: FluidTypes.UUID, include_customer_details?: boolean, include_payment_details?: boolean, options?: RequestInit): Promise<ApiResult<OrderResponse>> => {
+  let url = `${getBaseUrl()}/${order_id}/`;
+
+  const searchParams = new URLSearchParams();
+  if (include_customer_details !== undefined) {
+    searchParams.set('include_customer_details', String(include_customer_details));
+  }
+  if (include_payment_details !== undefined) {
+    searchParams.set('include_payment_details', String(include_payment_details));
+  }
+  if (searchParams.toString()) {
+    url += `?${searchParams.toString()}`;
+  }
+
+  const requestOptions: RequestInit = {
+    method: 'GET',
+    headers: options?.headers,
+    ...options
+  };
+
+  const response = await fetch(url, requestOptions);
+  return handleResponse(response);
+};
+
+/**
+ * Get order tracking information
+ *
+ * @param order_id
+ * @param detailed
+ */
+export const get_order_tracking = async (order_id: FluidTypes.UUID, detailed?: boolean, options?: RequestInit): Promise<ApiResult<Record<string, any>>> => {
+  let url = `${getBaseUrl()}/${order_id}/tracking`;
+
+  const searchParams = new URLSearchParams();
+  if (detailed !== undefined) {
+    searchParams.set('detailed', String(detailed));
+  }
+  if (searchParams.toString()) {
+    url += `?${searchParams.toString()}`;
+  }
+
+  const requestOptions: RequestInit = {
+    method: 'GET',
+    headers: options?.headers,
+    ...options
+  };
+
+  const response = await fetch(url, requestOptions);
+  return handleResponse(response);
+};

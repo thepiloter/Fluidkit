@@ -264,9 +264,9 @@ export const get_recommendations = async (
 
 The same generated client works seamlessly in both SSR and browser:
 
-- **Server-side rendering**: Direct FastAPI communication
+- **Server-side rendering**: Proxied through SvelteKit routes 
 - **Browser interactions**: Proxied through SvelteKit routes
-- **Development**: Hot reload across Python and Svelte changes
+- **Development**: Hot reload across Python and Svelte changes with unified proxy handling
 - **Production**: Optimized builds with proper environment detection
 
 ## Integration Setup
