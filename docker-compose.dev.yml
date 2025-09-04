@@ -1,0 +1,35 @@
+# Development environment with hot reload
+version: '3.8'
+
+services:
+  fluidkit-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+      - ENVIRONMENT=development
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Live code mounting for development
+      - ./fluidkit:/app/fluidkit
+      - ./tests:/app/tests
+      - ./docs:/app/docs
+      - ./.fluidkit:/app/.fluidkit
+      # Cache Python packages to avoid reinstalling
+      - fluidkit-pip-cache:/root/.cache/pip
+    networks:
+      - fluidkit-dev
+    command: ["python", "-m", "uvicorn", "tests.sample.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    restart: unless-stopped
+
+networks:
+  fluidkit-dev:
+    driver: bridge
+
+volumes:
+  fluidkit-pip-cache:
+    driver: local

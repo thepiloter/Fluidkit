@@ -12,6 +12,43 @@ FluidKit provides tooling for building modern, highly optimized fullstack web ap
 pip install fluidkit
 ```
 
+## 🐳 Docker Quick Start
+
+FluidKit can run entirely in Docker for isolated, consistent development:
+
+```bash
+# Clone and build
+git clone https://github.com/AswanthManoj/Fluidkit.git
+cd Fluidkit
+
+# Build and run with Docker Compose
+docker-compose up -d
+
+# Access the application
+# API: http://localhost:8000
+# Docs: http://localhost:8000/docs
+```
+
+### Docker Commands
+
+```bash
+# Development with live reload
+docker-compose -f docker-compose.dev.yml up
+
+# Generate TypeScript clients
+docker run --rm -v "$(pwd)":/app -v "$(pwd)/.fluidkit":/app/.fluidkit fluidkit:latest python test.py
+
+# Run tests
+docker run --rm -v "$(pwd)":/app fluidkit:latest python -m pytest tests/ -v
+```
+
+**Windows users:** Use `docker-run.bat` instead:
+```cmd
+docker-run.bat build
+docker-run.bat dev
+docker-run.bat generate
+```
+
 ## Build Modern Web Apps with Python
 
 Access the JavaScript ecosystem for UI while keeping all your business logic in Python. No Node.js backend knowledge required.
@@ -88,9 +125,9 @@ async def get_message() -> Message:
 ```svelte
 <script>
   import { get_message } from './hello.api';
-  
+
   let message = $state('');
-  
+
   get_message().then(result => {
     if (result.success) message = result.data.text;
   });
@@ -136,11 +173,11 @@ fluidkit.integrate(app, enable_fullstack=True)
 ```svelte
 <script>
   import { get_user } from './users.api';
-  
+
   let userId = $state('');
   let user = $state(null);
   let error = $state('');
-  
+
   function loadUser() {
     error = '';
     get_user(userId).then(result => {
@@ -193,13 +230,66 @@ export const get_user = async (user_id: FluidTypes.UUID): Promise<ApiResult<User
 ## 🚀 Key Features
 
 - **Unified Development Experience** - Write Python, get modern SvelteKit web apps
-- **Complete Type Safety** - Python types → TypeScript interfaces automatically  
+- **Complete Type Safety** - Python types → TypeScript interfaces automatically
 - **Environment-Aware Proxying** - Same client works in SSR and browser seamlessly
 - **Streaming First-Class** - SSE, file downloads, JSON streaming support
 - **Smart External Types** - UUID, Decimal, DateTime via clean `FluidTypes` namespace
 - **Auto-Discovery** - SvelteKit-style file-based routing patterns
 - **Zero Node.js Knowledge Required** - Pure Python backend development
 - **Highly Optimized** - SvelteKit's SSR, hydration, code splitting, and performance
+- **🐳 Docker Ready** - Fully containerized development and deployment
+
+## 🐳 Docker Deployment
+
+FluidKit is designed to run seamlessly in containerized environments:
+
+### Production Deployment
+```bash
+# Build production image
+docker build -t fluidkit-app .
+
+# Run with Docker Compose
+docker-compose up -d
+
+# Scale horizontally
+docker-compose up -d --scale fluidkit-app=3
+```
+
+### Development Environment
+```bash
+# Development with live reload
+docker-compose -f docker-compose.dev.yml up
+
+# Access logs
+docker-compose logs -f
+
+# Generate clients in container
+docker run --rm -v "$(pwd)/.fluidkit":/app/.fluidkit fluidkit-app python test.py
+```
+
+### Environment Variables
+- `ENVIRONMENT`: `development` | `production`
+- `PYTHONPATH`: `/app` (automatically set)
+- `PORT`: `8000` (default)
+
+The Docker setup includes:
+- Multi-stage builds for optimized images
+- Non-root user for security
+- Health checks for reliability
+- Volume mounts for generated files
+- Development and production configurations
+
+### Testing Docker Setup
+```bash
+# Run comprehensive tests
+python test-docker.py
+
+# Check container logs
+docker-compose logs -f
+
+# Access API documentation
+# http://localhost:8000/docs
+```
 
 ## 🛠️ Two Development Modes
 
@@ -211,7 +301,7 @@ Perfect for existing projects, microservices, or when frontend/backend deploy se
 fluidkit.integrate(app)
 ```
 - Clean `.fluidkit/` output directory
-- Copy generated clients to any frontend project  
+- Copy generated clients to any frontend project
 - Works with React, Vue, vanilla TypeScript, etc.
 - Full type safety across the API boundary
 
@@ -241,7 +331,7 @@ fluidkit.integrate(app, enable_fullstack=True)
 ## 🛣️ Roadmap
 
 - ✅ **TypeScript Client Generation** (current)
-- ✅ **SvelteKit Full-Stack Integration** (current)  
+- ✅ **SvelteKit Full-Stack Integration** (current)
 - 🚧 **CLI Tooling** - Project templates, deployment orchestration
 - 🚧 **Python Client Generation** - Full Python ecosystem
 - 🚧 **Advanced Streaming** - WebSockets, real-time features
